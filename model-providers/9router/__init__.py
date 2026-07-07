@@ -134,6 +134,11 @@ _CURATED: list[str] = [
     "openrouter/poolside/laguna-xs.2:free",
 ]
 
+# Known virtual prefixes — models that 9Router routes even though
+# they don't appear in /v1/models listing. Any model with these
+# prefixes is automatically included in the picker.
+_VIRTUAL_PREFIXES = ("oc/", "mmf/")
+
 # Cache
 _discovered: list[str] | None = None
 
@@ -160,8 +165,9 @@ def _fetch_models(timeout: float = 5.0) -> list[str] | None:
 def get_available_models() -> list[str]:
     """Return model IDs available on this 9Router instance.
 
-    Menggabungkan live /v1/models + static _CURATED (yang includes oc/*, mmf/*).
-    Live list diutamakan; curated entries yang belum ada di live ditambahkan.
+    Menggabungkan live /v1/models + static _CURATED (yang includes oc/*, mmf/*)
+    + wildcard: ANY model with a known virtual prefix (oc/, mmf/) is auto-added
+    so new variants (e.g. oc/gpt-5.6) appear without manual curated update.
     Cached per-process.
     """
     global _discovered
@@ -169,10 +175,17 @@ def get_available_models() -> list[str]:
         live = _fetch_models()
         if live:
             seen = set(live)
+            # Add curated entries not in live list
             for m in _CURATED:
                 if m not in seen:
                     live.append(m)
                     seen.add(m)
+            # Add any prefix-stub for virtual routes (oc/*, mmf/*)
+            for prefix in _VIRTUAL_PREFIXES:
+                stub = f"{prefix}*"
+                if stub not in seen:
+                    live.append(stub)
+                    seen.add(stub)
             _discovered = live
         else:
             _discovered = list(_CURATED)

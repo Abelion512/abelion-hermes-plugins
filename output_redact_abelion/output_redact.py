@@ -13,41 +13,9 @@ from __future__ import annotations
 import logging
 import re
 
-logger = logging.getLogger(__name__)
+from ._patterns import PAREN_CRED_RE
 
-# ── Prose credential annotation pattern ────────────────────────────────
-# Catches parenthetical credential labels in free-form AI prose.
-# Value is bounded to 6 words before the annotation.
-# Labels derived from common patterns in ~/.hermes/.env:
-#   password, pass, pw, secret, token, apikey, credentials,
-#   apppass, app_email, pass_email, auth, client_id, client_secret,
-#   webhook_secret, sudo_password, username, email.
-# Preserves the parenthetical label for debuggability.
-_PAREN_CRED_RE = re.compile(
-    r"(\S+(?:\s+\S+){0,5}?)\s*"
-    r"(\(\s*"
-    r"(?:"
-    r"  app[ _-]?(?:email|pass(?:word)?)"
-    r"  |pass[ _-]?email"
-    r"  |client[ _-]?(?:id|secret)"
-    r"  |api[ _-]?(?:key|secret)"
-    r"  |auth[ _-]?(?:token|key)?"
-    r"  |webhook[ _-]?secret"
-    r"  |sudo[ _-]?password"
-    r"  |password\s+nya"
-    r"  |password|pass|pw"
-    r"  |secret(?:s)?"
-    r"  |credentials?"
-    r"  |token"
-    r"  |apikey"
-    r"  |email"
-    r"  |user\s?name"
-    r"  |user"
-    r"  |apppass"
-    r")\s*"
-    r"\))",
-    re.IGNORECASE | re.VERBOSE,
-)
+logger = logging.getLogger(__name__)
 
 
 def redact_output(response_text: str) -> str | None:
@@ -70,7 +38,7 @@ def redact_output(response_text: str) -> str | None:
 
     # Layer 1: prose parenthetical credentials
     if "(" in text and ")" in text:
-        new_text, n = _PAREN_CRED_RE.subn(
+        new_text, n = PAREN_CRED_RE.subn(
             lambda m: "*** " + m.group(2), text
         )
         if n > 0:

@@ -20,6 +20,8 @@ import re
 from copy import deepcopy
 from typing import Any, Optional
 
+from ._patterns import PAREN_CRED_RE
+
 logger = logging.getLogger(__name__)
 
 # ── Sensitivity levels ────────────────────────────────────────────────
@@ -46,31 +48,8 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'^\s*(?:export\s+)?(?:\w+)_(?:API_KEY|TOKEN|PASSWORD|SECRET)\s*[:=].+', re.MULTILINE), "ENV_ENTRY"),
     # Prose credential annotations: ``value (password)``, ``user (username)``
     # Catches credentials labeled in free-form prose before reaching provider.
-    # Labels derived from .env patterns: password/pass/pw/secret/token/apikey/email/user/etc.
-    (re.compile(
-        r'(?i)(\S+(?:\s+\S+){0,5}?)\s*'
-        r'\(\s*'
-        r'(?:'
-        r'app[ _-]?(?:email|pass(?:word)?)'
-        r'|pass[ _-]?email'
-        r'|client[ _-]?(?:id|secret)'
-        r'|api[ _-]?(?:key|secret)'
-        r'|auth[ _-]?(?:token|key)?'
-        r'|webhook[ _-]?secret'
-        r'|sudo[ _-]?password'
-        r'|password\s+nya'
-        r'|password|pass|pw'
-        r'|secret(?:s)?'
-        r'|credentials?'
-        r'|token'
-        r'|apikey'
-        r'|email'
-        r'|user\s?name'
-        r'|user'
-        r'|apppass'
-        r')\s*'
-        r'\)'
-    ), "PAREN_CRED"),
+    # Pattern imported from _patterns.py (shared with output_redact_abelion).
+    (PAREN_CRED_RE, "PAREN_CRED"),
     # Connection strings
     (re.compile(r'(?i)(postgres|mysql|mongodb|redis)://[^@\s]+@'), "DB_CONNECTION"),
     (re.compile(r'(?i)https?://[^@\s]+:[^@\s]+@'), "URL_WITH_CREDS"),

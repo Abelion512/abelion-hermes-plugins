@@ -1,0 +1,12 @@
+name: 9router
+description: "9Router model provider (localhost:20128). Registers 110+ models including oc/* and mmf/* routes."
+version: 1.0.0
+author: Abelion
+kind: backend
+metadata:
+  hermes:
+    category: provider
+    tags: [provider, 9router, model, gateway]
+    config:
+      base_url: http://localhost:20128/v1
+      env_vars: [NINEROUTER_API_KEY]

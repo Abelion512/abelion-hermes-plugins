@@ -124,8 +124,25 @@
       function fit() {
         const el = screenRef.current;
         if (!el) return;
-        const top = el.getBoundingClientRect().top;
-        el.style.height = Math.max(240, Math.floor(window.innerHeight - top - 24)) + "px";
+        // The real height bound is the dashboard's scroll container (MAIN,
+        // overflow-y-auto), not the window: intermediate paddings (the plugin
+        // page's own 16px and the route wrapper's 2rem) live below the canvas
+        // inside that scroller. Size against it, then self-correct by the
+        // measured leftover overflow so no magic number has to track Hermes
+        // layout changes.
+        let sc = el.parentElement;
+        while (sc && sc !== document.body) {
+          const oy = getComputedStyle(sc).overflowY;
+          if (oy === "auto" || oy === "scroll") break;
+          sc = sc.parentElement;
+        }
+        if (!sc || sc === document.body) sc = document.documentElement;
+        const scRect = sc.getBoundingClientRect();
+        const top = el.getBoundingClientRect().top - scRect.top + sc.scrollTop;
+        const h = Math.max(240, Math.floor(sc.clientHeight - top - 8));
+        el.style.height = h + "px";
+        const over = sc.scrollHeight - sc.clientHeight;
+        if (over > 0) el.style.height = Math.max(240, h - over) + "px";
       }
       fit();
       const t1 = setTimeout(fit, 300);

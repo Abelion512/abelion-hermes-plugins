@@ -1,0 +1,2 @@
+# Mirrors plugin.yaml python_dependencies exactly; CI audits this list.
+aiohttp>=3.10,<4

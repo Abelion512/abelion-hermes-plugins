@@ -16,7 +16,7 @@ cd "$REPO"
 git pull --ff-only
 
 echo "⟳ Syncing to $PLUGIN_DIR..."
-for d in shield_abelion pii_mask_abelion output_redact_abelion tool_context_abelion rsi_learn_abelion; do
+for d in shield_abelion pii_mask_abelion output_redact_abelion tool_context_abelion rsi_learn_abelion screenview_abelion; do
   rsync -a --delete "$d/" "$PLUGIN_DIR/$d/"
   echo "  ✅ $d"
 done

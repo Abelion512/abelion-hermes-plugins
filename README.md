@@ -11,6 +11,7 @@ Abelion security, context, and provider plugins for [Hermes Agent](https://githu
 | `output-redact-abelion` | `output_redact_abelion/` | transform_llm_output | Redact credentials from AI response |
 | `tool-context-abelion` | `tool_context_abelion/` | pre_llm_call | Inject datetime + tool reminder + execution mandate |
 | `rsi-learn-abelion` | `rsi_learn_abelion/` | pre_llm_call, post_tool_call | RSI lesson extraction and decision layer |
+| `screenview-abelion` | `screenview_abelion/` | dashboard plugin | Live Bot Screen view + Take over / Hand back (noVNC) |
 | `9router` | `model-providers/9router/` | provider profile | 9Router multi-model gateway (110+ models) |
 
 ## Install

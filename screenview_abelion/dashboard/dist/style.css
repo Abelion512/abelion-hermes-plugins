@@ -1,0 +1,9 @@
+.hermes-screen-page { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 16px; box-sizing: border-box; }
+.hermes-screen-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hermes-screen-actions { margin-left: auto; display: flex; gap: 8px; }
+.hermes-screen-pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: hsl(var(--muted, 220 14% 20%)); color: hsl(var(--muted-foreground, 220 9% 64%)); }
+.hermes-screen-pill--on { background: hsl(150 60% 25%); color: hsl(150 80% 80%); }
+.hermes-screen-pill--warn { background: hsl(40 90% 25%); color: hsl(40 95% 75%); }
+.hermes-screen-build { font-size: 11px; opacity: 0.5; }
+.hermes-screen-error { font-size: 13px; color: hsl(0 80% 70%); background: hsl(0 60% 15% / 0.6); border: 1px solid hsl(0 60% 30%); border-radius: 8px; padding: 8px 12px; }
+.hermes-screen-canvas { flex: 1; min-height: 320px; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }

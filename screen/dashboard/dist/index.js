@@ -68,6 +68,7 @@
       catch (_e) { return "fit"; }
     });
     const zoomRef = useRef(zoom);
+    const [isFs, setIsFs] = useState(false);
     function applyZoom(rfb, z, viewOnly) {
       // fit: noVNC scales the remote into the container. 100%: no scaling
       // and NO clipViewport - the canvas keeps the full remote size and the
@@ -153,39 +154,37 @@
       setTimeout(function () { if (!deadRef.current) connect(); }, 2000);
     }, [connect]);
 
-    // Fit the canvas to the REAL leftover viewport: the dashboard's route
-    // container gives plugins width but no height bound (App.tsx), so the
-    // noVNC canvas (intrinsic 1440x900) stretched the page and made it
-    // scroll. Measure the container's top against the window instead.
-    function fit() {
-        const el = screenRef.current;
-        if (!el) return;
-        if (document.fullscreenElement === el) { el.style.height = "100%"; return; }
-        // The real height bound is the dashboard's scroll container (MAIN,
-        // overflow-y-auto), not the window: intermediate paddings (the plugin
-        // page's own 16px and the route wrapper's 2rem) live below the canvas
-        // inside that scroller. Size against it, then self-correct by the
-        // measured leftover overflow so no magic number has to track Hermes
-        // layout changes.
-      let sc = el.parentElement;
-      while (sc && sc !== document.body) {
-        const oy = getComputedStyle(sc).overflowY;
-        if (oy === "auto" || oy === "scroll") break;
-        sc = sc.parentElement;
-      }
-      if (!sc || sc === document.body) sc = document.documentElement;
-      const scRect = sc.getBoundingClientRect();
-      const top = el.getBoundingClientRect().top - scRect.top + sc.scrollTop;
-      let h = Math.max(160, Math.floor(sc.clientHeight - top - 8));
-      el.style.height = h + "px";
-      // Converge: content below the canvas (hint line, page padding) shows up
-      // as leftover overflow; shrink by it until the scroller fits.
-      for (let i = 0; i < 5; i++) {
-        const over = sc.scrollHeight - sc.clientHeight;
-        if (over <= 0) break;
-        h = Math.max(160, h - over);
-        el.style.height = Math.floor(h) + "px";
-      }
+    // Edge-to-edge layout: the shell wraps plugin routes in a padded column
+    // (App.tsx: px-3 sm:px-6, pt-2/4/6, pb-8 + the route wrapper's pb). We
+    // NEGATE those paddings with measured negative margins so the desktop
+    // touches the sidebar, the page header, and the browser's right/bottom
+    // edges - plugin-owned CSS only, no shell edit. Paddings are MEASURED at
+    // runtime (not hardcoded), so shell spacing changes can't silently break
+    // the flush. Height = the column's full clientHeight; the parent's
+    // padding-bottom is cancelled by the negative margin-bottom, so the route
+    // gains no scrollbar.
+    const pageRef = useRef(null);
+    function layoutFlush() {
+      const el = pageRef.current;
+      if (!el) return;
+      if (document.fullscreenElement === el) return; // CSS :fullscreen owns sizing
+      const parent = el.parentElement;
+      const grand = parent && parent.parentElement;
+      if (!parent || !grand) return;
+      const pc = getComputedStyle(parent);
+      const gc = getComputedStyle(grand);
+      const num = function (v) { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+      const ml = num(pc.paddingLeft) + num(gc.paddingLeft);
+      const mr = num(pc.paddingRight) + num(gc.paddingRight);
+      const mt = num(pc.paddingTop) + num(gc.paddingTop);
+      const mb = num(pc.paddingBottom) + num(gc.paddingBottom);
+      const hgt = grand.clientHeight;
+      if (hgt < 200) return; // unexpected host: keep graceful default flow
+      el.style.marginLeft = -ml + "px";
+      el.style.marginRight = -mr + "px";
+      el.style.marginTop = -mt + "px";
+      el.style.marginBottom = -mb + "px";
+      el.style.height = Math.floor(hgt) + "px";
     }
 
     // Zoom: "fit" shrinks the whole desktop into view (default; small text on
@@ -199,44 +198,54 @@
       const el = screenRef.current;
       if (el) el.classList.toggle("hermes-screen-canvas--clip", zoom === "100");
       applyZoom(rfbRef.current, zoom, lease !== "human");
-      fit();
-      // The 100% hint line appears in the same commit; re-fit after layout
-      // settles so the canvas height accounts for it.
-      const raf = requestAnimationFrame(fit);
-      return () => cancelAnimationFrame(raf);
     }, [zoom, lease]);
-    // Content above the canvas (toolbar wrap on narrow screens, hint, status
-    // pill) can grow after connect without a window resize; watch the page
-    // column and re-fit so the route never gains a scrollbar.
+    // Sidebar collapse/expand, window resizes and shell reflows change the
+    // padded column's box; re-measure so the flush stays pixel-exact. noVNC's
+    // own ResizeObserver re-scales the remote to the canvas for fit mode.
     useEffect(function () {
-      const el = screenRef.current;
+      const el = pageRef.current;
       if (!el || typeof ResizeObserver === "undefined") return;
-      const ro = new ResizeObserver(function () { fit(); });
-      ro.observe(el);
-      if (el.parentElement) ro.observe(el.parentElement);
-      return function () { ro.disconnect(); };
+      const ro = new ResizeObserver(function () { layoutFlush(); });
+      if (el.parentElement && el.parentElement.parentElement) {
+        ro.observe(el.parentElement.parentElement);
+      }
+      window.addEventListener("resize", layoutFlush);
+      return function () {
+        ro.disconnect();
+        window.removeEventListener("resize", layoutFlush);
+      };
     }, []);
     function toggleFullscreen() {
-      const el = screenRef.current;
+      const el = pageRef.current;
       if (!el) return;
-      if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); }
-      else if (el.requestFullscreen) { el.requestFullscreen().catch(function () {}); }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(function () {});
+      } else if (el.requestFullscreen) {
+        // Surface a rejection instead of failing silently: on a phone the
+        // reason (gesture, permission, unsupported) is the only feedback.
+        const p = el.requestFullscreen();
+        if (p && p.catch) p.catch(function (e) {
+          setErr("Layar penuh gagal: " + ((e && e.message) || e));
+        });
+      } else {
+        setErr("Layar penuh tidak didukung browser ini.");
+      }
     }
     useEffect(function () {
-      function onFs() { fit(); }
+      function onFs() { setIsFs(!!document.fullscreenElement); }
       document.addEventListener("fullscreenchange", onFs);
-      return function () { document.removeEventListener("fullscreenchange", onFs); };
+      document.addEventListener("fullscreenerror", onFs);
+      return function () {
+        document.removeEventListener("fullscreenchange", onFs);
+        document.removeEventListener("fullscreenerror", onFs);
+      };
     }, []);
 
     useEffect(function () {
-      fit();
-      const t1 = setTimeout(fit, 300);
-      const t2 = setTimeout(fit, 1500);
-      window.addEventListener("resize", fit);
-      return function () {
-        clearTimeout(t1); clearTimeout(t2);
-        window.removeEventListener("resize", fit);
-      };
+      layoutFlush();
+      const t1 = setTimeout(layoutFlush, 300);
+      const t2 = setTimeout(layoutFlush, 1500);
+      return function () { clearTimeout(t1); clearTimeout(t2); };
     }, []);
 
     // Mount: auto-connect view-only + poll lease; unmount: clean disconnect
@@ -301,7 +310,19 @@
 
     const connected = conn === "connected";
     const orphaned = lease === "human" && weHold === false;
-    return h("div", { className: "hermes-screen-page" },
+    const overlay =
+      orphaned || recovery || note || err
+        ? h("div", { className: "hermes-screen-overlay" },
+            orphaned ? h("div", { className: "hermes-screen-hint" },
+              "Layar dipegang sesi lain: bisa sisa sesi sebelum dashboard restart, bisa perangkat lain yang sedang aktif. Take over mengambil alih dari sesi itu.") : null,
+            recovery ? h("div", { className: "hermes-screen-hint" },
+              "Hand back biasa tidak berpengaruh karena kendali dipegang sesi/perangkat lain. ",
+              h("button", { className: "hermes-screen-forcelink", onClick: forceHandback },
+                "Lepaskan kendali sesi itu ke agen")) : null,
+            note ? h("div", { className: "hermes-screen-hint" }, note) : null,
+            err ? h("div", { className: "hermes-screen-error" }, err) : null)
+        : null;
+    return h("div", { className: "hermes-screen-page", ref: pageRef },
       h("div", { className: "hermes-screen-toolbar" },
         h("span", {
           className: "hermes-screen-pill" + (connected ? " hermes-screen-pill--on" : ""),
@@ -316,22 +337,17 @@
           h(Button, { size: "sm", variant: "outline",
                       onClick: function () { setZoom(zoom === "100" ? "fit" : "100"); } },
             zoom === "100" ? "Zoom: 100%" : "Zoom: pas"),
-          h(Button, { size: "sm", variant: "outline", onClick: toggleFullscreen }, "Layar penuh"),
+          h(Button, { size: "sm", variant: "outline", onClick: toggleFullscreen },
+            isFs ? "Tutup layar penuh" : "Layar penuh"),
           h(Button, { size: "sm", variant: "outline", onClick: connect, disabled: connected }, "Connect"),
           h(Button, { size: "sm", onClick: takeover,
                       disabled: !connected || (lease === "human" && weHold === true) }, "Take over"),
           h(Button, { size: "sm", variant: "outline", onClick: handback,
                       disabled: lease !== "human" }, "Hand back"))),
-      orphaned ? h("div", { className: "hermes-screen-hint" },
-        "Layar dipegang sesi lain: bisa sisa sesi sebelum dashboard restart, bisa perangkat lain yang sedang aktif. Take over mengambil alih dari sesi itu.") : null,
-      recovery ? h("div", { className: "hermes-screen-hint" },
-        "Hand back biasa tidak berpengaruh karena kendali dipegang sesi/perangkat lain. ",
-        h("button", { className: "hermes-screen-forcelink", onClick: forceHandback },
-          "Lepaskan kendali sesi itu ke agen")) : null,
-      note ? h("div", { className: "hermes-screen-hint" }, note) : null,
-      err ? h("div", { className: "hermes-screen-error" }, err) : null,
-      h("div", { className: "hermes-screen-canvas", ref: screenRef,
-                 "data-viewonly": lease !== "human" ? "true" : "false" }));
+      h("div", { className: "hermes-screen-stage" },
+        h("div", { className: "hermes-screen-canvas", ref: screenRef,
+                   "data-viewonly": lease !== "human" ? "true" : "false" }),
+        overlay));
   }
 
   if (window.__HERMES_PLUGINS__ && typeof window.__HERMES_PLUGINS__.register === "function") {

@@ -254,6 +254,42 @@
         el.removeEventListener("wheel", wheel, { capture: true });
       };
     }, [zoom, lease]);
+
+    // Header unification (option A, Sessions pattern): the shell renders its
+    // own route header carrying only the "Screen" title, and the plugin SDK
+    // exposes no header slot or portal. While this page is mounted, that
+    // specific header (located by its h1 text) is hidden via a scoped inline
+    // style - re-asserted if the shell re-renders - and the plugin renders
+    // its own combined title+controls bar in the same visual row. Fully
+    // restored on unmount; if the header is not found, nothing is hidden.
+    useEffect(function () {
+      const LABEL = "Screen";
+      let hidden = null, prev = "";
+      function locate() {
+        const hs = document.querySelectorAll("header");
+        for (const hd of hs) {
+          const h1 = hd.querySelector("h1");
+          if (h1 && h1.textContent.trim() === LABEL) return hd;
+        }
+        return null;
+      }
+      function apply() {
+        if (hidden && !hidden.isConnected) hidden = null;
+        const hd = locate();
+        if (hd && hd !== hidden) {
+          if (hidden) hidden.style.display = prev;
+          hidden = hd; prev = hd.style.display;
+        }
+        if (hidden && hidden.style.display !== "none") hidden.style.display = "none";
+      }
+      apply();
+      const mo = new MutationObserver(apply);
+      mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
+      return function () {
+        mo.disconnect();
+        if (hidden && hidden.isConnected) hidden.style.display = prev;
+      };
+    }, []);
     // Sidebar collapse/expand, window resizes and shell reflows change the
     // padded column's box; re-measure so the flush stays pixel-exact. noVNC's
     // own ResizeObserver re-scales the remote to the canvas for fit mode.
@@ -379,6 +415,7 @@
         : null;
     return h("div", { className: "hermes-screen-page", ref: pageRef },
       h("div", { className: "hermes-screen-toolbar" },
+        h("span", { className: "hermes-screen-title" }, "Screen"),
         h("span", {
           className: "hermes-screen-pill" + (connected ? " hermes-screen-pill--on" : ""),
           "data-conn": conn,

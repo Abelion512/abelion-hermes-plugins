@@ -175,7 +175,6 @@
       // The bottom margin also swallows the TOP reclaim so the parent chain's
       // box never exceeds the scroller and the route gains no scrollbar.
       let sc = el.parentElement;
-      let sc = el.parentElement;
       while (sc && sc !== document.body) {
         const oy = getComputedStyle(sc).overflowY;
         if (oy === "auto" || oy === "scroll") break;

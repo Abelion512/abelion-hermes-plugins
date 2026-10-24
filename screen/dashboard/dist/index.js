@@ -175,28 +175,27 @@
       // The bottom margin also swallows the TOP reclaim so the parent chain's
       // box never exceeds the scroller and the route gains no scrollbar.
       let sc = el.parentElement;
-      const chain = [];
+      let sc = el.parentElement;
       while (sc && sc !== document.body) {
         const oy = getComputedStyle(sc).overflowY;
         if (oy === "auto" || oy === "scroll") break;
-        chain.push(sc);
         sc = sc.parentElement;
       }
-      if (!sc || sc === document.body || !chain.length) return;
+      if (!sc || sc === document.body) sc = document.documentElement;
+      // Rect-based flush: exact even when the scroller reserves a scrollbar
+      // gutter (clientWidth math with paddings undershoots by the gutter).
+      if (sc.clientHeight < 200) return; // unexpected host: graceful default
+      const sr = sc.getBoundingClientRect();
+      let r = el.getBoundingClientRect();
+      const pc = getComputedStyle(el);
       const num = function (v) { const n = parseFloat(v); return isFinite(n) ? n : 0; };
-      let pl = 0, pr = 0, pt = 0, pb = 0;
-      for (const a of chain) {
-        const cs = getComputedStyle(a);
-        pl += num(cs.paddingLeft); pr += num(cs.paddingRight);
-        pt += num(cs.paddingTop); pb += num(cs.paddingBottom);
-      }
-      const hgt = sc.clientHeight;
-      if (hgt < 200) return; // unexpected host: keep graceful default flow
-      el.style.marginLeft = -pl + "px";
-      el.style.marginRight = -pr + "px";
-      el.style.marginTop = -pt + "px";
-      el.style.marginBottom = -(pb + pt) + "px";
-      el.style.height = Math.floor(hgt) + "px";
+      el.style.marginLeft = num(pc.marginLeft) + (sr.left - r.left) + "px";
+      el.style.marginRight = "0px";
+      el.style.marginTop = num(pc.marginTop) + (sr.top - r.top) + "px";
+      el.style.marginBottom = "0px";
+      r = el.getBoundingClientRect(); // forced reflow: margins applied
+      el.style.width = Math.max(0, Math.floor(sr.left + sc.clientWidth - r.left)) + "px";
+      el.style.height = Math.max(0, Math.floor(sr.top + sc.clientHeight - r.top)) + "px";
     }
 
     // Zoom: "fit" shrinks the whole desktop into view (default; small text on

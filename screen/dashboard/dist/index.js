@@ -63,6 +63,24 @@
     const [err, setErr] = useState(null);
     const [build, setBuild] = useState("");
 
+    const [zoom, setZoom] = useState(function () {
+      try { return localStorage.getItem("hermes-screen-zoom") === "100" ? "100" : "fit"; }
+      catch (_e) { return "fit"; }
+    });
+    const zoomRef = useRef(zoom);
+    function applyZoom(rfb, z, viewOnly) {
+      // fit: noVNC scales the remote into the container. 100%: no scaling
+      // and NO clipViewport - the canvas keeps the full remote size and the
+      // viewer's own overflow:auto div gives native scroll/wheel panning
+      // (clipViewport instead crops to a window you can only drag-pan).
+      // Pointer mapping stays correct: noVNC maps through the canvas's
+      // (scrolled) bounding rect.
+      if (!rfb) return;
+      rfb.scaleViewport = z === "fit";
+      rfb.clipViewport = false;
+      rfb.dragViewport = false;
+    }
+
     const refreshLease = useCallback(async function () {
       try {
         const j = await SDK.fetchJSON(`${API}/status`);
@@ -87,7 +105,7 @@
         if (rfbRef.current) { try { rfbRef.current.disconnect(); } catch (_e) {} }
         const rfb = new RFB(screenRef.current, url, {});
         rfb.viewOnly = true;
-        rfb.scaleViewport = true;
+        applyZoom(rfb, zoomRef.current, true);
         rfb.addEventListener("connect", function () {
           everConnected.current = true;
           attempts.current = 0;
@@ -139,30 +157,78 @@
     // container gives plugins width but no height bound (App.tsx), so the
     // noVNC canvas (intrinsic 1440x900) stretched the page and made it
     // scroll. Measure the container's top against the window instead.
-    useEffect(function () {
-      function fit() {
+    function fit() {
         const el = screenRef.current;
         if (!el) return;
+        if (document.fullscreenElement === el) { el.style.height = "100%"; return; }
         // The real height bound is the dashboard's scroll container (MAIN,
         // overflow-y-auto), not the window: intermediate paddings (the plugin
         // page's own 16px and the route wrapper's 2rem) live below the canvas
         // inside that scroller. Size against it, then self-correct by the
         // measured leftover overflow so no magic number has to track Hermes
         // layout changes.
-        let sc = el.parentElement;
-        while (sc && sc !== document.body) {
-          const oy = getComputedStyle(sc).overflowY;
-          if (oy === "auto" || oy === "scroll") break;
-          sc = sc.parentElement;
-        }
-        if (!sc || sc === document.body) sc = document.documentElement;
-        const scRect = sc.getBoundingClientRect();
-        const top = el.getBoundingClientRect().top - scRect.top + sc.scrollTop;
-        const h = Math.max(240, Math.floor(sc.clientHeight - top - 8));
-        el.style.height = h + "px";
-        const over = sc.scrollHeight - sc.clientHeight;
-        if (over > 0) el.style.height = Math.max(240, h - over) + "px";
+      let sc = el.parentElement;
+      while (sc && sc !== document.body) {
+        const oy = getComputedStyle(sc).overflowY;
+        if (oy === "auto" || oy === "scroll") break;
+        sc = sc.parentElement;
       }
+      if (!sc || sc === document.body) sc = document.documentElement;
+      const scRect = sc.getBoundingClientRect();
+      const top = el.getBoundingClientRect().top - scRect.top + sc.scrollTop;
+      let h = Math.max(160, Math.floor(sc.clientHeight - top - 8));
+      el.style.height = h + "px";
+      // Converge: content below the canvas (hint line, page padding) shows up
+      // as leftover overflow; shrink by it until the scroller fits.
+      for (let i = 0; i < 5; i++) {
+        const over = sc.scrollHeight - sc.clientHeight;
+        if (over <= 0) break;
+        h = Math.max(160, h - over);
+        el.style.height = Math.floor(h) + "px";
+      }
+    }
+
+    // Zoom: "fit" shrinks the whole desktop into view (default; small text on
+    // big remote resolutions); "100%" shows real pixels with pan (drag in view
+    // mode, scrollbars otherwise). Fullscreen gives the fit mode the whole
+    // display. Input coordinates stay correct in both: noVNC maps pointer
+    // position through its own transform.
+    useEffect(function () {
+      zoomRef.current = zoom;
+      try { localStorage.setItem("hermes-screen-zoom", zoom); } catch (_e) {}
+      const el = screenRef.current;
+      if (el) el.classList.toggle("hermes-screen-canvas--clip", zoom === "100");
+      applyZoom(rfbRef.current, zoom, lease !== "human");
+      fit();
+      // The 100% hint line appears in the same commit; re-fit after layout
+      // settles so the canvas height accounts for it.
+      const raf = requestAnimationFrame(fit);
+      return () => cancelAnimationFrame(raf);
+    }, [zoom, lease]);
+    // Content above the canvas (toolbar wrap on narrow screens, hint, status
+    // pill) can grow after connect without a window resize; watch the page
+    // column and re-fit so the route never gains a scrollbar.
+    useEffect(function () {
+      const el = screenRef.current;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      const ro = new ResizeObserver(function () { fit(); });
+      ro.observe(el);
+      if (el.parentElement) ro.observe(el.parentElement);
+      return function () { ro.disconnect(); };
+    }, []);
+    function toggleFullscreen() {
+      const el = screenRef.current;
+      if (!el) return;
+      if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); }
+      else if (el.requestFullscreen) { el.requestFullscreen().catch(function () {}); }
+    }
+    useEffect(function () {
+      function onFs() { fit(); }
+      document.addEventListener("fullscreenchange", onFs);
+      return function () { document.removeEventListener("fullscreenchange", onFs); };
+    }, []);
+
+    useEffect(function () {
       fit();
       const t1 = setTimeout(fit, 300);
       const t2 = setTimeout(fit, 1500);
@@ -247,6 +313,10 @@
         }, "lease: " + lease),
         build ? h("span", { className: "hermes-screen-build" }, build) : null,
         h("div", { className: "hermes-screen-actions" },
+          h(Button, { size: "sm", variant: "outline",
+                      onClick: function () { setZoom(zoom === "100" ? "fit" : "100"); } },
+            zoom === "100" ? "Zoom: 100%" : "Zoom: pas"),
+          h(Button, { size: "sm", variant: "outline", onClick: toggleFullscreen }, "Layar penuh"),
           h(Button, { size: "sm", variant: "outline", onClick: connect, disabled: connected }, "Connect"),
           h(Button, { size: "sm", onClick: takeover,
                       disabled: !connected || (lease === "human" && weHold === true) }, "Take over"),

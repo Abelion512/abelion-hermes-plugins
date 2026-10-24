@@ -14,3 +14,8 @@
 .hermes-screen-canvas:fullscreen { width: 100%; border-radius: 0; }
 /* 100% zoom: real pixels, pan via scrollbars (drag when view-only). */
 .hermes-screen-canvas--clip { display: block; }
+@media (max-width: 560px) {
+  .hermes-screen-toolbar { gap: 6px; }
+  .hermes-screen-actions { margin-left: 0; flex-wrap: wrap; }
+  .hermes-screen-hint { display: none; }
+}

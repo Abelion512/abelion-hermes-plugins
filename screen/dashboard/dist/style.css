@@ -20,6 +20,11 @@
 
 /* 100% zoom: real pixels, pan via scrollbars (drag when view-only). */
 .hermes-screen-canvas--clip { display: block; overflow: auto; }
+/* noVNC's inner wrapper is inline-styled display:flex with canvas margin:auto;
+   flex centering makes 100%-zoom overflow unreachable, so flatten it in clip
+   mode and let the wrapper's own overflow:auto pan the real-size canvas. */
+.hermes-screen-canvas--clip > div { display: block !important; }
+.hermes-screen-canvas--clip > div > canvas { margin: 0 !important; }
 @media (max-width: 560px) {
   .hermes-screen-toolbar { gap: 6px; padding: 4px 8px; }
   .hermes-screen-actions { margin-left: 0; flex-wrap: wrap; }

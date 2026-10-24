@@ -10,9 +10,12 @@
  * holding the lease hands control back to the agent (Hermes bridge does
  * that itself); an abrupt drop keeps the human lease. If the dashboard
  * itself restarted mid-takeover, that kept lease is orphaned to a dead
- * viewer id: the tab then shows "kendali dipegang sesi sebelumnya" and an
- * explicit Take over (last-writer-wins) or Hand back (Hermes's documented
- * release force:true for a lost viewer id) recovers it.
+ * viewer id. A foreign-held lease can ALSO be another live viewer (second
+ * tab, Hermes Desktop, phone) - the plugin cannot tell those apart, so
+ * recovery is always an explicit, effect-naming user action: Take over
+ * (last-writer-wins) or the confirmed force hand-back (Hermes's documented
+ * release force:true for a lost viewer id). A plain Hand back never
+ * escalates on its own.
  */
 (function () {
   "use strict";
@@ -56,6 +59,7 @@
     const [lease, setLease] = useState("unknown");
     const [weHold, setWeHold] = useState(null);
     const [note, setNote] = useState(null);
+    const [recovery, setRecovery] = useState(false);
     const [err, setErr] = useState(null);
     const [build, setBuild] = useState("");
 
@@ -161,6 +165,7 @@
       try {
         const j = await SDK.fetchJSON(`${API}/lease/acquire`, { method: "POST" });
         applyLeaseResponse(j);
+        setRecovery(false);
       } catch (e) { setErr("Take over gagal: " + apiErrorMessage(e)); }
       refreshLease();
     }
@@ -169,8 +174,26 @@
       try {
         const j = await SDK.fetchJSON(`${API}/lease/release`, { method: "POST" });
         applyLeaseResponse(j);
-        if (j && j.forced) setNote("Kendali sesi sebelum restart sudah dikembalikan ke agen.");
+        // Foreign holder (dead session OR another live viewer - we cannot
+        // tell): only the explicit confirm below may escalate to force.
+        setRecovery(j && j.recovery_required === true);
       } catch (e) { setErr("Hand back gagal: " + apiErrorMessage(e)); }
+      refreshLease();
+    }
+    async function forceHandback() {
+      setErr(null); setNote(null);
+      try {
+        const j = await SDK.fetchJSON(`${API}/lease/release`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: true }),
+        });
+        applyLeaseResponse(j);
+        setRecovery(false);
+        if (j && j.forced && j.holder === "agent") {
+          setNote("Kendali sesi lain dilepas; layar kembali ke agen.");
+        }
+      } catch (e) { setErr("Lepas paksa gagal: " + apiErrorMessage(e)); }
       refreshLease();
     }
 
@@ -194,7 +217,11 @@
           h(Button, { size: "sm", variant: "outline", onClick: handback,
                       disabled: lease !== "human" }, "Hand back"))),
       orphaned ? h("div", { className: "hermes-screen-hint" },
-        "Layar masih dipegang sesi sebelum dashboard restart. Klik Take over untuk ambil alih, atau Hand back untuk kembalikan ke agen.") : null,
+        "Layar dipegang sesi lain: bisa sisa sesi sebelum dashboard restart, bisa perangkat lain yang sedang aktif. Take over mengambil alih dari sesi itu.") : null,
+      recovery ? h("div", { className: "hermes-screen-hint" },
+        "Hand back biasa tidak berpengaruh karena kendali dipegang sesi/perangkat lain. ",
+        h("button", { className: "hermes-screen-forcelink", onClick: forceHandback },
+          "Lepaskan kendali sesi itu ke agen")) : null,
       note ? h("div", { className: "hermes-screen-hint" }, note) : null,
       err ? h("div", { className: "hermes-screen-error" }, err) : null,
       h("div", { className: "hermes-screen-canvas", ref: screenRef,

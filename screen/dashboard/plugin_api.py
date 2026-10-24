@@ -291,6 +291,18 @@ async def lease(request: Request, action: str):
         raise HTTPException(status_code=404, detail="unknown lease action")
     if not _viewer_id:
         return JSONResponse({"ok": False, "error": "observe first"}, status_code=409)
+    # force:true is passed through ONLY when the browser asked for it
+    # explicitly. A foreign-held human lease (viewer_hash != ours) can be a
+    # dead id from before a restart OR another LIVE viewer (second tab,
+    # Hermes Desktop, the phone) - the plugin cannot tell them apart, so a
+    # generic Hand back must never escalate on its own.
+    force = False
+    if action == "release":
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        force = isinstance(body, dict) and body.get("force") is True
     # If the live connection never minted our id (reconnect), re-observe
     # first: that also refreshes ticket + identity.
     if _rpc is not None and _viewer_id not in _rpc.minted_ids:
@@ -300,9 +312,11 @@ async def lease(request: Request, action: str):
             return _err(e)
         _ticket = observed.get("ticket")
         _viewer_id = observed.get("viewer_id")
+    params = {"viewer_id": _viewer_id}
+    if force:
+        params = {"force": True}
     try:
-        result = await _rpc_call(request, f"display.lease.{action}",
-                                 {"viewer_id": _viewer_id})
+        result = await _rpc_call(request, f"display.lease.{action}", params)
     except UpstreamError as e:
         # The connection may have dropped after our pre-check; "not minted"
         # means the (new) transport never observed. Re-observe once, retry.
@@ -318,30 +332,16 @@ async def lease(request: Request, action: str):
         else:
             return _err(e)
     lease_view = result.get("lease") or {}
-    forced = False
-    if (action == "release" and lease_view.get("holder") == "human"
-            and not _we_hold(lease_view)):
-        # The Hand back click was explicit, but the human lease is held by a
-        # viewer id this connection never minted: the dashboard restarted (or
-        # dropped) mid-takeover and Hermes kept the human lease on the dead id
-        # (abrupt-drop protection, web_routers/display.py). Hermes's documented
-        # recovery for a client that lost its id is release(force=True)
-        # (tui_gateway/methods_display.py display.lease.release: "a client
-        # that lost its viewer id must not be able to yank control ... unless
-        # it says so explicitly (force)"). The user's click IS the explicit
-        # ask; force only ever RELEASES a stuck human lease, never takes over.
-        try:
-            result = await _rpc_call(request, "display.lease.release",
-                                     {"force": True})
-            forced = True
-            lease_view = result.get("lease") or {}
-        except UpstreamError as e:
-            return _err(e)
     return {"ok": result.get("ok", True),
             "holder": lease_view.get("holder"),
             "lease": result.get("lease"),
             "we_hold": _we_hold(lease_view),
-            "forced": forced,
+            # True when a plain release changed nothing because a foreign id
+            # holds the lease: the UI must offer the explicit recovery step.
+            "recovery_required": (action == "release" and not force
+                                  and lease_view.get("holder") == "human"
+                                  and not _we_hold(lease_view)),
+            "forced": force,
             "reason": result.get("reason")}
 
 

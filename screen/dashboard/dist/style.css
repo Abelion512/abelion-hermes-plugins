@@ -8,3 +8,4 @@
 .hermes-screen-error { font-size: 13px; color: hsl(0 80% 70%); background: hsl(0 60% 15% / 0.6); border: 1px solid hsl(0 60% 30%); border-radius: 8px; padding: 8px 12px; }
 .hermes-screen-canvas { flex: 0 0 auto; min-height: 240px; height: calc(100dvh - 220px); background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .hermes-screen-hint { font-size: 13px; color: hsl(40 95% 75%); background: hsl(40 90% 15% / 0.6); border: 1px solid hsl(40 60% 30%); border-radius: 8px; padding: 8px 12px; }
+.hermes-screen-forcelink { background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: hsl(40 95% 80%); text-decoration: underline; cursor: pointer; }

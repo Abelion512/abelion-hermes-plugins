@@ -195,6 +195,10 @@
       r = el.getBoundingClientRect(); // forced reflow: margins applied
       el.style.width = Math.max(0, Math.floor(sr.left + sc.clientWidth - r.left)) + "px";
       el.style.height = Math.max(0, Math.floor(sr.top + sc.clientHeight - r.top)) + "px";
+      // Cancel any trailing padding below the plugin so the route keeps a
+      // zero scroll extent (e.g. the shell route wrapper's bottom padding).
+      const extra = sc.scrollHeight - sc.clientHeight;
+      if (extra > 0) el.style.marginBottom = -extra + "px";
     }
 
     // Zoom: "fit" shrinks the whole desktop into view (default; small text on

@@ -32,6 +32,7 @@ HERMES_SCREEN_UPSTREAM (test-only): point RPC + RFB at another ws base
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -44,7 +45,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-BUILD = "screen-plugin v0.1-20261024"
+BUILD = "screen-plugin v0.2-20261024"
 MAX_WS_FRAME = 64 * 1024 * 1024
 ALLOWED_RPC = ("display.observe", "display.status",
                "display.lease.acquire", "display.lease.release")
@@ -210,6 +211,18 @@ _ticket: str | None = None
 _viewer_id: str | None = None
 
 
+def _we_hold(lease: dict | None) -> bool:
+    """True when the human lease is held by OUR live viewer id. Hermes never
+    publishes the raw holder id (it is a capability); public_view replaces it
+    with sha256(id)[:12] (tools/bot_desktop/lease.py public_view), so the
+    holder can recognise itself - and a restart-orphaned lease (holder id
+    minted by a dead connection) is distinguishable from one we hold."""
+    if not lease or lease.get("holder") != "human" or not _viewer_id:
+        return False
+    return lease.get("viewer_hash") == hashlib.sha256(
+        _viewer_id.encode()).hexdigest()[:12]
+
+
 def _client(request: Request) -> GatewayRpc:
     global _rpc, _rpc_base
     base = _upstream_base(request)
@@ -246,7 +259,8 @@ async def status(request: Request):
         result = await _rpc_call(request, "display.status")
     except UpstreamError as e:
         return _err(e)
-    return {"ok": True, "status": result}
+    return {"ok": True, "status": result,
+            "we_hold": _we_hold((result or {}).get("lease"))}
 
 
 @router.post("/observe")
@@ -266,7 +280,8 @@ async def observe(request: Request):
     return {"ok": True, "viewer_id": _viewer_id,
             "geometry": result.get("geometry"),
             "running": result.get("running"),
-            "lease": result.get("lease")}
+            "lease": result.get("lease"),
+            "we_hold": _we_hold(result.get("lease"))}
 
 
 @router.post("/lease/{action}")
@@ -302,9 +317,31 @@ async def lease(request: Request, action: str):
                 return _err(e2)
         else:
             return _err(e)
+    lease_view = result.get("lease") or {}
+    forced = False
+    if (action == "release" and lease_view.get("holder") == "human"
+            and not _we_hold(lease_view)):
+        # The Hand back click was explicit, but the human lease is held by a
+        # viewer id this connection never minted: the dashboard restarted (or
+        # dropped) mid-takeover and Hermes kept the human lease on the dead id
+        # (abrupt-drop protection, web_routers/display.py). Hermes's documented
+        # recovery for a client that lost its id is release(force=True)
+        # (tui_gateway/methods_display.py display.lease.release: "a client
+        # that lost its viewer id must not be able to yank control ... unless
+        # it says so explicitly (force)"). The user's click IS the explicit
+        # ask; force only ever RELEASES a stuck human lease, never takes over.
+        try:
+            result = await _rpc_call(request, "display.lease.release",
+                                     {"force": True})
+            forced = True
+            lease_view = result.get("lease") or {}
+        except UpstreamError as e:
+            return _err(e)
     return {"ok": result.get("ok", True),
-            "holder": (result.get("lease") or {}).get("holder"),
+            "holder": lease_view.get("holder"),
             "lease": result.get("lease"),
+            "we_hold": _we_hold(lease_view),
+            "forced": forced,
             "reason": result.get("reason")}
 
 

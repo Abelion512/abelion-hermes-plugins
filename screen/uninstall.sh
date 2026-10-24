@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rollback/removal untuk screenview-abelion (dashboard plugin).
+# Rollback/removal untuk plugin dashboard screen.
 # Mengembalikan backup install terbaru (config + salinan plugin sebelumnya)
 # bila ada, kalau tidak ada cukup menghapus plugin dan unset. Tidak pernah
 # start/stop gateway atau dashboard; restart sendiri setelahnya.
@@ -9,19 +9,14 @@ DEST="$HERMES_HOME_DIR/plugins"
 CFG="$HERMES_HOME_DIR/config.yaml"
 
 cfg_bak="$(ls -1t "$CFG".bak-screen-* 2>/dev/null | head -1 || true)"
-folder_bak="$(ls -1dt "$DEST"/screenview_abelion.bak-* 2>/dev/null | head -1 || true)"
-legacy_bak="$(ls -1dt "$DEST"/screen.bak-* 2>/dev/null | head -1 || true)"
+folder_bak="$(ls -1dt "$DEST"/screen.bak-* 2>/dev/null | head -1 || true)"
 
-rm -rf "$DEST/screenview_abelion"
-echo ">> plugin dihapus dari $DEST/screenview_abelion"
+rm -rf "$DEST/screen"
+echo ">> plugin dihapus dari $DEST/screen"
 
 if [ -n "$folder_bak" ]; then
-  mv "$folder_bak" "$DEST/screenview_abelion"
+  mv "$folder_bak" "$DEST/screen"
   echo ">> versi sebelumnya dikembalikan dari $folder_bak"
-fi
-if [ -n "$legacy_bak" ]; then
-  mv "$legacy_bak" "$DEST/screen"
-  echo ">> instalasi era-zip dikembalikan ke $DEST/screen"
 fi
 
 if [ -n "$cfg_bak" ]; then

@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# screenview-abelion installer (repo layout) - dashboard plugin untuk Hermes.
-# - menyalin dashboard/ ke ~/.hermes/plugins/screenview_abelion/ (salinan lama
-#   DIPINDAH ke backup bertimestamp, tidak ditimpa)
-# - meminggirkan instalasi era-zip di ~/.hermes/plugins/screen bila ada, supaya
-#   tab yang sama tidak terdaftar dua kali
+# screen plugin installer (repo layout) - dashboard plugin untuk Hermes.
+# - menyalin dashboard/ ke ~/.hermes/plugins/screen/ (salinan lama DIPINDAH ke
+#   backup bertimestamp, tidak ditimpa)
 # - backup config.yaml sebelum disentuh; memverifikasi schema plugins.enabled
 #   saat ini (lewat `hermes config get` resmi) dan BERHENTI tanpa mengubah apa
 #   pun bila nilainya bukan daftar yang bisa digabung dengan aman
-# - menggabungkan "screen" (nama plugin di manifest) ke plugins.enabled lewat
-#   `hermes config set` resmi
+# - menggabungkan "screen" ke plugins.enabled lewat `hermes config set` resmi
 # - tidak pernah start/stop/restart gateway atau dashboard; hanya mencetak
 #   instruksi restart di akhir
 set -euo pipefail
 cd "$(dirname "$0")"
-[ -d dashboard ] || { echo "!! jalankan dari folder screenview_abelion (dashboard/ tidak ditemukan)"; exit 1; }
+[ -d dashboard ] || { echo "!! jalankan dari folder screen (dashboard/ tidak ditemukan)"; exit 1; }
 
 HERMES_HOME_DIR="${HERMES_HOME:-$HOME/.hermes}"
 DEST="$HERMES_HOME_DIR/plugins"
@@ -41,19 +38,17 @@ if [ -f "$CFG" ]; then
   cp -p "$CFG" "$CFG.bak-screen-$TS"
   echo ">> backup config: $CFG.bak-screen-$TS"
 fi
-if [ -e "$DEST/screenview_abelion" ]; then
-  mv "$DEST/screenview_abelion" "$DEST/screenview_abelion.bak-$TS"
-  echo ">> versi lama dipindah ke $DEST/screenview_abelion.bak-$TS (tidak ditimpa)"
-fi
 if [ -e "$DEST/screen" ]; then
   mv "$DEST/screen" "$DEST/screen.bak-$TS"
-  echo ">> instalasi era-zip di \$DEST/screen dipinggirkan ke $DEST/screen.bak-$TS"
+  echo ">> versi lama dipindah ke $DEST/screen.bak-$TS (tidak ditimpa)"
 fi
 
 # --- 3) install + official enable (merge, sorted-unique) ---------------------
-mkdir -p "$DEST/screenview_abelion"
-cp -r dashboard "$DEST/screenview_abelion/dashboard"
-echo ">> plugin tersalin ke $DEST/screenview_abelion"
+mkdir -p "$DEST/screen"
+cp -r dashboard "$DEST/screen/dashboard"
+cp -f plugin.yaml "$DEST/screen/plugin.yaml" 2>/dev/null || true
+cp -f __init__.py "$DEST/screen/__init__.py" 2>/dev/null || true
+echo ">> plugin tersalin ke $DEST/screen"
 
 json="["; first=1
 { echo "screen"; if [ -n "$CURRENT" ]; then printf '%s\n' "$CURRENT"; fi; } \

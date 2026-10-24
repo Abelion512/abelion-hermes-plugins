@@ -35,8 +35,8 @@
       "description": "9Router model provider (110+ models, oc/*, mmf/*)"
     },
     {
-      "id": "screenview-abelion",
-      "path": "screenview_abelion",
+      "id": "screen",
+      "path": "screen",
       "description": "dashboard plugin: live Bot Screen viewer + Take over / Hand back (noVNC)"
     }
   ]

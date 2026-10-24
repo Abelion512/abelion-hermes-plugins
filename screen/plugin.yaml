@@ -1,0 +1,11 @@
+name: screen
+description: "Dashboard tab: live Bot Screen view + Take over / Hand back (noVNC, per-profile)."
+version: 0.1.0
+author: Abelion
+kind: general
+python_dependencies:
+  - "aiohttp>=3.10,<4"
+metadata:
+  hermes:
+    category: dashboard
+    tags: [screen, dashboard, novnc, takeover, bot-screen]

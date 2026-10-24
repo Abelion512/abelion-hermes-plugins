@@ -27,6 +27,8 @@ class MockUpstream:
         self.reason = ""
         # display/ws connections: {conn_id: "clean" | "abrupt" | "open"}
         self.display_conns = {}
+        # When set, display_ws accepts then closes with this code.
+        self.close_display_with = None
         self._next_conn = 0
 
     def public_view(self):
@@ -115,6 +117,13 @@ class MockUpstream:
             return web.Response(status=401)
         ws = web.WebSocketResponse()
         await ws.prepare(request)
+        if self.close_display_with is not None:
+            # Simulate the real bridge refusing AFTER accept (e.g. 4401 when
+            # the single-use ticket was already consumed): the splice must
+            # forward this code to the tab instead of a bare 1000.
+            await ws.close(code=self.close_display_with,
+                           message=b"ticket missing, expired or used")
+            return ws
         self._next_conn += 1
         cid = self._next_conn
         self.display_conns[cid] = "open"

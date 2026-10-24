@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import time
 import json
 import logging
 import os
@@ -45,7 +46,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-BUILD = "screen-plugin v0.3-20261024"
+BUILD = "screen-plugin v0.4-20261024"
 MAX_WS_FRAME = 64 * 1024 * 1024
 ALLOWED_RPC = ("display.observe", "display.status",
                "display.lease.acquire", "display.lease.release")
@@ -208,6 +209,15 @@ class GatewayRpc:
 _rpc: GatewayRpc | None = None
 _rpc_base: str | None = None
 _ticket: str | None = None
+# Last display-ws close, for the tab's diagnostics after an abnormal drop.
+# Codes/reasons only - never the ticket, never the dashboard session token.
+_last_close: dict | None = None
+
+
+def _record_close(code, reason, side):
+    global _last_close
+    _last_close = {"code": code, "reason": str(reason or "")[:120],
+                   "side": side, "at": time.time()}
 _viewer_id: str | None = None
 
 
@@ -357,28 +367,46 @@ def _ws_upgrade_authorized(ws: WebSocket) -> bool:
     return bool(_ws._ws_auth_ok(ws))
 
 
+@router.get("/display/last_close")
+async def display_last_close():
+    """Why the previous splice ended, so the tab can say something better
+    than 'black screen'. No secrets: codes and short reasons only."""
+    return {"ok": True, "last_close": _last_close}
+
+
 @router.websocket("/display/ws")
 async def display_ws(ws: WebSocket):
+    global _ticket
     if not _ws_upgrade_authorized(ws):
         await ws.close(code=4401)
         return
-    if not _ticket:
-        await ws.close(code=4409)
-        return
     await ws.accept()
+    # Pop atomically: the upstream ticket is single-use, so a second splice
+    # must never consume a ticket a fresher /observe already replaced (two
+    # tabs or a rapid re-refresh racing). The loser retries via /observe.
+    # Close AFTER accept: a pre-accept close arrives as a bare 1006 network
+    # failure and the tab could never tell what happened (upstream display
+    # router follows the same rule).
+    ticket, _ticket = _ticket, None
+    if not ticket:
+        _record_close(4409, "no fresh display ticket (observe first)", "plugin")
+        await ws.close(code=4409, reason="observe first, then reconnect")
+        return
     base = _rpc_base or "ws://127.0.0.1:9119"
-    url = f"{base}/api/display/ws?display_ticket={_ticket}"
+    url = f"{base}/api/display/ws?display_ticket={ticket}"
     sess = aiohttp.ClientSession()
     try:
         up = await sess.ws_connect(url, max_msg_size=MAX_WS_FRAME)
     except aiohttp.ClientResponseError:
         log.warning("upstream display bridge refused the ticket")
         await sess.close()
+        _record_close(4401, "upstream refused the display ticket", "upstream")
         await ws.close(code=4401)
         return
     except (aiohttp.ClientConnectorError, ConnectionError, OSError):
         log.warning("upstream display bridge unreachable")
         await sess.close()
+        _record_close(1011, "upstream display bridge unreachable", "upstream")
         await ws.close(code=1011)
         return
 
@@ -418,6 +446,8 @@ async def display_ws(ws: WebSocket):
     except Exception:
         log.exception("display splice failed")
     finally:
+        # Capture BEFORE our own polite close sets it to 1000.
+        up_code = up.close_code
         # Mirror the browser's goodbye upstream so Hermes applies its own
         # lease semantics: CLEAN close -> auto hand-back to the agent;
         # ABRUPT drop -> human lease kept.
@@ -427,7 +457,15 @@ async def display_ws(ws: WebSocket):
             except Exception:
                 pass
         await sess.close()
+        # Forward the REAL upstream close to the tab (4401 bad/expired
+        # ticket, 4000 control-taken, 4001 desktop gone, ...) instead of a
+        # bare 1000 that looks identical for every failure mode.
+        allowed = {1000, 1001, 1003, 1011} | set(range(4000, 5000))
+        code = up_code if up_code in allowed else (1000 if clean else 1011)
+        _record_close(code, "upstream closed" if up_code is not None
+                      else ("viewer closed" if clean else "viewer dropped"),
+                      "upstream" if up_code is not None else "viewer")
         try:
-            await ws.close()
+            await ws.close(code=code)
         except Exception:
             pass

@@ -168,22 +168,34 @@
       const el = pageRef.current;
       if (!el) return;
       if (document.fullscreenElement === el) return; // CSS :fullscreen owns sizing
-      const parent = el.parentElement;
-      const grand = parent && parent.parentElement;
-      if (!parent || !grand) return;
-      const pc = getComputedStyle(parent);
-      const gc = getComputedStyle(grand);
+      // Find the route's scroll container (MAIN overflow-y-auto) and sum the
+      // paddings of every ancestor between the plugin and it. Negating those
+      // with margins makes the desktop touch the sidebar, the page header and
+      // the browser's right/bottom edges; height = the scroller's client box.
+      // The bottom margin also swallows the TOP reclaim so the parent chain's
+      // box never exceeds the scroller and the route gains no scrollbar.
+      let sc = el.parentElement;
+      const chain = [];
+      while (sc && sc !== document.body) {
+        const oy = getComputedStyle(sc).overflowY;
+        if (oy === "auto" || oy === "scroll") break;
+        chain.push(sc);
+        sc = sc.parentElement;
+      }
+      if (!sc || sc === document.body || !chain.length) return;
       const num = function (v) { const n = parseFloat(v); return isFinite(n) ? n : 0; };
-      const ml = num(pc.paddingLeft) + num(gc.paddingLeft);
-      const mr = num(pc.paddingRight) + num(gc.paddingRight);
-      const mt = num(pc.paddingTop) + num(gc.paddingTop);
-      const mb = num(pc.paddingBottom) + num(gc.paddingBottom);
-      const hgt = grand.clientHeight;
+      let pl = 0, pr = 0, pt = 0, pb = 0;
+      for (const a of chain) {
+        const cs = getComputedStyle(a);
+        pl += num(cs.paddingLeft); pr += num(cs.paddingRight);
+        pt += num(cs.paddingTop); pb += num(cs.paddingBottom);
+      }
+      const hgt = sc.clientHeight;
       if (hgt < 200) return; // unexpected host: keep graceful default flow
-      el.style.marginLeft = -ml + "px";
-      el.style.marginRight = -mr + "px";
-      el.style.marginTop = -mt + "px";
-      el.style.marginBottom = -mb + "px";
+      el.style.marginLeft = -pl + "px";
+      el.style.marginRight = -pr + "px";
+      el.style.marginTop = -pt + "px";
+      el.style.marginBottom = -(pb + pt) + "px";
       el.style.height = Math.floor(hgt) + "px";
     }
 

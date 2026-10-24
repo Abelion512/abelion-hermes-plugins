@@ -221,7 +221,9 @@
       const el = screenRef.current;
       if (zoom !== "100" || !el) return;
       function scroller() { return el.firstElementChild; }
-      function viewOnly() { const r = rfbRef.current; return !r || r.viewOnly; }
+      // lease state (not rfb.viewOnly) is the source of truth: refreshLease
+      // may run before the RFB exists, leaving rfb.viewOnly stale-false.
+      function viewOnly() { return lease !== "human"; }
       let drag = null;
       function down(e) {
         if (!viewOnly() || !scroller()) return;
@@ -251,7 +253,7 @@
         window.removeEventListener("pointerup", up, true);
         el.removeEventListener("wheel", wheel, { capture: true });
       };
-    }, [zoom]);
+    }, [zoom, lease]);
     // Sidebar collapse/expand, window resizes and shell reflows change the
     // padded column's box; re-measure so the flush stays pixel-exact. noVNC's
     // own ResizeObserver re-scales the remote to the canvas for fit mode.

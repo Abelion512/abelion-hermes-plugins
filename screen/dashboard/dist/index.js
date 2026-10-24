@@ -213,6 +213,45 @@
       if (el) el.classList.toggle("hermes-screen-canvas--clip", zoom === "100");
       applyZoom(rfbRef.current, zoom, lease !== "human");
     }, [zoom, lease]);
+
+    // 100%-zoom panning while view-only: noVNC swallows pointer/wheel events
+    // even when it ignores them, so in clip mode we drag/wheel the inner
+    // scroller ourselves. In Take over mode every event belongs to the remote.
+    useEffect(function () {
+      const el = screenRef.current;
+      if (zoom !== "100" || !el) return;
+      function scroller() { return el.firstElementChild; }
+      function viewOnly() { const r = rfbRef.current; return !r || r.viewOnly; }
+      let drag = null;
+      function down(e) {
+        if (!viewOnly() || !scroller()) return;
+        drag = { x: e.clientX, y: e.clientY, sl: scroller().scrollLeft, st: scroller().scrollTop };
+        e.preventDefault(); e.stopPropagation();
+      }
+      function move(e) {
+        if (!drag || !scroller()) return;
+        scroller().scrollLeft = drag.sl - (e.clientX - drag.x);
+        scroller().scrollTop = drag.st - (e.clientY - drag.y);
+        e.preventDefault();
+      }
+      function up() { drag = null; }
+      function wheel(e) {
+        if (!viewOnly() || !scroller()) return;
+        scroller().scrollLeft += e.deltaX;
+        scroller().scrollTop += e.deltaY;
+        e.preventDefault(); e.stopPropagation();
+      }
+      el.addEventListener("pointerdown", down, true);
+      window.addEventListener("pointermove", move, true);
+      window.addEventListener("pointerup", up, true);
+      el.addEventListener("wheel", wheel, { capture: true, passive: false });
+      return function () {
+        el.removeEventListener("pointerdown", down, true);
+        window.removeEventListener("pointermove", move, true);
+        window.removeEventListener("pointerup", up, true);
+        el.removeEventListener("wheel", wheel, { capture: true });
+      };
+    }, [zoom]);
     // Sidebar collapse/expand, window resizes and shell reflows change the
     // padded column's box; re-measure so the flush stays pixel-exact. noVNC's
     // own ResizeObserver re-scales the remote to the canvas for fit mode.

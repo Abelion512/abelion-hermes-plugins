@@ -54,6 +54,8 @@
     const everConnected = useRef(false);
     const attempts = useRef(0);
     const pollRef = useRef(null);
+    const retryRef = useRef(null);
+    const connectingRef = useRef(false);
 
     const [conn, setConn] = useState("memutuskan");
     const [lease, setLease] = useState("unknown");
@@ -96,30 +98,53 @@
 
     const connect = useCallback(async function () {
       if (deadRef.current) return;
+      // Satu siklus connect pada satu waktu: klik ganda / retry yang
+      // bertumpuk dengan klik manual tidak boleh membuat RFB paralel.
+      if (connectingRef.current) return;
+      connectingRef.current = true;
+      if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
       setConn("menyambung...");
       setErr(null);
+      setNote(null);
       try {
         await SDK.fetchJSON(`${API}/observe`, { method: "POST" });
         const RFB = await loadRFB();
         const url = await SDK.buildWsUrl(`${API}/display/ws`, {});
-        if (deadRef.current || !screenRef.current) return;
-        if (rfbRef.current) { try { rfbRef.current.disconnect(); } catch (_e) {} }
+        if (deadRef.current || !screenRef.current) { connectingRef.current = false; return; }
+        // Gantikan viewer lama secara utuh: putuskan DAN buang DOM-nya.
+        // noVNC tidak menghapus canvas-nya saat disconnect, jadi tanpa
+        // pembersihan ini tiap siklus menambah satu canvas baru di stage.
+        const old = rfbRef.current;
+        rfbRef.current = null;
+        if (old) { try { old.disconnect(); } catch (_e) {} }
+        screenRef.current.textContent = "";
         const rfb = new RFB(screenRef.current, url, {});
         rfb.viewOnly = true;
         applyZoom(rfb, zoomRef.current, true);
         rfb.addEventListener("connect", function () {
+          // Event dari viewer yang sudah digantikan tidak boleh menyentuh
+          // state: cegah banner/usang dan counter yang menempel pada sesi baru.
+          if (rfbRef.current !== rfb) return;
+          connectingRef.current = false;
           everConnected.current = true;
           attempts.current = 0;
           setConn("connected");
+          setNote(null);
           refreshLease();
         });
         rfb.addEventListener("disconnect", function () {
+          // Tanpa cek identitas ini, event disconnect ASINKRON dari viewer
+          // lama menghapus ref viewer baru dan memicu scheduleReconnect()
+          // palsu - siklus putus-sambung dan canvas bertumpuk bermula di sini.
+          if (rfbRef.current !== rfb) return;
           rfbRef.current = null;
+          connectingRef.current = false;
           setConn("terputus");
           scheduleReconnect();
         });
         rfbRef.current = rfb;
       } catch (e) {
+        connectingRef.current = false;
         setConn("gagal");
         setErr(apiErrorMessage(e));
         scheduleReconnect();
@@ -151,7 +176,11 @@
         const t = j && j.last_close && closeReasonText(j.last_close);
         if (t) setNote(t);
       }).catch(function () {});
-      setTimeout(function () { if (!deadRef.current) connect(); }, 2000);
+      if (retryRef.current) clearTimeout(retryRef.current);
+      retryRef.current = setTimeout(function () {
+        retryRef.current = null;
+        if (!deadRef.current) connect();
+      }, 2000);
     }, [connect]);
 
     // Edge-to-edge layout: the shell wraps plugin routes in a padded column
@@ -351,6 +380,7 @@
       return function () {
         deadRef.current = true;
         if (pollRef.current) clearInterval(pollRef.current);
+        if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
         if (rfbRef.current) { try { rfbRef.current.disconnect(); } catch (_e) {} }
         rfbRef.current = null;
       };
@@ -431,7 +461,7 @@
             zoom === "100" ? "Zoom: 100%" : "Zoom: pas"),
           h(Button, { size: "sm", variant: "outline", onClick: toggleFullscreen },
             isFs ? "Tutup layar penuh" : "Layar penuh"),
-          h(Button, { size: "sm", variant: "outline", onClick: connect, disabled: connected }, "Connect"),
+          h(Button, { size: "sm", variant: "outline", onClick: connect, disabled: connected || conn === "menyambung..." }, "Connect"),
           h(Button, { size: "sm", onClick: takeover,
                       disabled: !connected || (lease === "human" && weHold === true) }, "Take over"),
           h(Button, { size: "sm", variant: "outline", onClick: handback,

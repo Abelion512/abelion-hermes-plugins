@@ -88,9 +88,14 @@
       try {
         const j = await SDK.fetchJSON(`${API}/status`);
         const holder = (j.status && j.status.lease && j.status.lease.holder) || "unknown";
+        const hold = j.we_hold === true;
         setLease(holder);
-        setWeHold(j.we_hold === true);
-        if (rfbRef.current) rfbRef.current.viewOnly = holder !== "human";
+        setWeHold(hold);
+        // Input hanya untuk pemegang lease YANG ADALAH tab ini: holder "human"
+        // bisa berarti sesi/perangkat LAIN yang memegang (we_hold=false).
+        // (Gerbang sebenarnya ada di bridge Hermes; ini agar UX tab yang kalah
+        // jujur view-only dan tidak menelan pointer lokal.)
+        if (rfbRef.current) rfbRef.current.viewOnly = !(holder === "human" && hold);
       } catch (e) {
         setLease("error");
       }
@@ -167,15 +172,22 @@
       // tiket (tab lain / refresh ganda) atau load pertama yang lambat
       // harus pulih sendiri, bukan diam di layar hitam.
       if (deadRef.current) return;
-      if (attempts.current >= 3) { setConn("terputus - klik Connect"); return; }
-      attempts.current++;
-      setConn("terputus, menyambung ulang (" + attempts.current + "/3)...");
       // Tanyakan penyebab putus terakhir (kode+alasan saja, tanpa rahasia)
-      // supaya tab bisa bilang KENAPA, bukan cuma hitam.
+      // supaya tab bisa bilang KENAPA, bukan cuma hitam. Dilakukan SEBELUM
+      // cek batas percobaan: saat retry habis pun user berhak tahu alasannya.
       SDK.fetchJSON(`${API}/display/last_close`).then(function (j) {
         const t = j && j.last_close && closeReasonText(j.last_close);
         if (t) setNote(t);
       }).catch(function () {});
+      if (attempts.current >= 3) {
+        // Batalkan juga timer yang masih tertinggal: setelah status meminta
+        // klik manual, tidak boleh ada sambung-otomatis yang menyala diam-diam.
+        if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
+        setConn("terputus - klik Connect");
+        return;
+      }
+      attempts.current++;
+      setConn("terputus, menyambung ulang (" + attempts.current + "/3)...");
       if (retryRef.current) clearTimeout(retryRef.current);
       retryRef.current = setTimeout(function () {
         retryRef.current = null;
@@ -252,7 +264,7 @@
       function scroller() { return el.firstElementChild; }
       // lease state (not rfb.viewOnly) is the source of truth: refreshLease
       // may run before the RFB exists, leaving rfb.viewOnly stale-false.
-      function viewOnly() { return lease !== "human"; }
+      function viewOnly() { return !(lease === "human" && weHold === true); }
       let drag = null;
       function down(e) {
         if (!viewOnly() || !scroller()) return;
@@ -282,7 +294,7 @@
         window.removeEventListener("pointerup", up, true);
         el.removeEventListener("wheel", wheel, { capture: true });
       };
-    }, [zoom, lease]);
+    }, [zoom, lease, weHold]);
 
     // Header unification (option A, Sessions pattern): the shell renders its
     // own route header carrying only the "Screen" title, and the plugin SDK
@@ -388,9 +400,10 @@
 
     function applyLeaseResponse(j) {
       const holder = (j && j.lease && j.lease.holder) || null;
+      const hold = j && typeof j.we_hold === "boolean" ? j.we_hold : weHold === true;
       if (holder) setLease(holder);
       if (j && typeof j.we_hold === "boolean") setWeHold(j.we_hold);
-      if (rfbRef.current && holder) rfbRef.current.viewOnly = holder !== "human";
+      if (rfbRef.current && holder) rfbRef.current.viewOnly = !(holder === "human" && hold);
     }
     async function takeover() {
       setErr(null); setNote(null);

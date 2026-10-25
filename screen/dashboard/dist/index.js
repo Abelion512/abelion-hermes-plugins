@@ -158,8 +158,8 @@
 
     function closeReasonText(c) {
       if (!c) return null;
-      if (c.code === 4401) return "sesi display kedaluwarsa/dipakai - mencoba lagi";
-      if (c.code === 4409) return "sesi display belum siap - mencoba lagi";
+      if (c.code === 4401) return "sesi display kedaluwarsa/dipakai";
+      if (c.code === 4409) return "sesi display belum siap";
       if (c.code === 4000) return "kendali diambil sesi lain";
       if (c.code === 4001) return "Bot Desktop tidak sedang berjalan";
       if (c.code === 1011) return "jembatan display tidak terjangkau";
@@ -172,12 +172,15 @@
       // tiket (tab lain / refresh ganda) atau load pertama yang lambat
       // harus pulih sendiri, bukan diam di layar hitam.
       if (deadRef.current) return;
+      const exhausted = attempts.current >= 3;
       // Tanyakan penyebab putus terakhir (kode+alasan saja, tanpa rahasia)
       // supaya tab bisa bilang KENAPA, bukan cuma hitam. Dilakukan SEBELUM
       // cek batas percobaan: saat retry habis pun user berhak tahu alasannya.
+      // 'mencoba lagi' HANYA saat memang ada retry otomatis yang berjalan;
+      // saat habis, tindakannya manual (klik Connect), bukan janji palsu.
       SDK.fetchJSON(`${API}/display/last_close`).then(function (j) {
         const t = j && j.last_close && closeReasonText(j.last_close);
-        if (t) setNote(t);
+        if (t) setNote(t + (exhausted ? "" : " - mencoba lagi"));
       }).catch(function () {});
       if (attempts.current >= 3) {
         // Batalkan juga timer yang masih tertinggal: setelah status meminta

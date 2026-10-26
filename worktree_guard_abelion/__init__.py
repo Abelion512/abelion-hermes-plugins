@@ -1,17 +1,26 @@
-"""worktree_guard_abelion - keep the agent out of a repo's main checkout.
+"""worktree_guard_abelion - route agent edits out of a repo's main checkout.
 
-``pre_tool_call`` blocks, with a fix-it message, any write_file/patch on a path
-inside a git *main* checkout and any terminal command that obviously mutates
-files or git state while its working directory is in one. Linked worktrees
-(``git worktree add``), non-repo paths and repos listed in the allow env var
-pass through.
+Hooks (stdlib only, no core changes):
 
-Limits (by design, stdlib-only): this is a policy hook, not an OS sandbox. The
-terminal check is a best-effort pattern match, so an arbitrary shell command can
-still write outside a worktree. File tools are checked by resolved real path.
+* ``pre_tool_call``: when write_file/patch/terminal would modify a git *main*
+  checkout, the plugin creates (once per session and repo) a linked worktree
+  ``<repo>-worktrees/task-<id>`` on branch ``hermes/task-<id>`` and re-routes the
+  call into it (``modify`` args). Calls that cannot be re-routed safely (V4A
+  patch bodies, commands naming main-checkout paths, ``.git`` internals, this
+  plugin's own files) are blocked with the worktree path in the message. If the
+  worktree cannot be created the call is blocked (fail closed).
+* ``transform_tool_result``: tells the model a call was re-routed.
+* ``pre_verify``: once per turn, if the agent edited files in a worktree this
+  plugin created, asks it to run the project's checks and summarise
+  ``git diff --stat`` there before handing over. Never merges.
 
-Env: HERMES_WORKTREE_GUARD=off disables; HERMES_WORKTREE_GUARD_ALLOW=/a:/b
-lists repo roots that may be edited directly.
+Limits: a policy hook, not an OS sandbox. The terminal check is a pattern match;
+``execute_code`` and creative shell commands can still write anywhere. Paths
+outside any git repo are allowed by design.
+
+Env (read from the Hermes process, logged at start-up when set):
+HERMES_WORKTREE_GUARD=off disables everything;
+HERMES_WORKTREE_GUARD_ALLOW=/a:/b exempts those repo roots.
 """
 
 from __future__ import annotations
@@ -21,6 +30,7 @@ import os
 import re
 import shlex
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any, Optional
 
@@ -34,8 +44,14 @@ _GIT_MUTATORS = {
 }
 _FILE_MUTATORS = {"rm", "mv", "cp", "touch", "mkdir", "rmdir", "tee", "truncate", "patch", "install", "ln"}
 _SEGMENT_SPLIT = re.compile(r"&&|\|\||;|\||\n")
-_REDIRECT = re.compile(r"(?<![0-9&<])>>?\s*(?!&|/dev/null)\S")
+_REDIRECT_TARGET = re.compile(r"(?<![0-9&<])>>?\s*(?!&|/dev/null)(\S+)")
 _GIT_TIMEOUT = 3
+_ADD_TIMEOUT = 25  # Hermes cancels pre_tool_call hooks at 30s (fail closed)
+_PLUGIN_DIR = os.path.realpath(os.path.dirname(__file__))
+
+_lock = threading.RLock()
+_created: dict[tuple[str, str], str] = {}   # (session key, repo root) -> worktree path
+_pending: dict[str, str] = {}               # tool_call_id / "task:tool" -> notice
 
 
 def _disabled() -> bool:
@@ -47,30 +63,30 @@ def _allowed_roots() -> set[str]:
     return {os.path.realpath(p) for p in raw.split(os.pathsep) if p.strip()}
 
 
-def _git(cwd: str, *args: str) -> Optional[str]:
-    """stdout of git, None when git says no (not a repo) or is missing; raises on timeout."""
+def _git(cwd: str, *args: str, timeout: float = _GIT_TIMEOUT) -> Optional[str]:
+    """stdout, or None when git fails (not a repo, bad ref) or is missing. Raises TimeoutExpired."""
     try:
-        res = subprocess.run(
-            ["git", "-C", cwd, *args], capture_output=True, text=True, timeout=_GIT_TIMEOUT,
-        )
+        res = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
         return None
     return res.stdout.strip() if res.returncode == 0 else None
 
 
 def main_checkout_root(path: str) -> Optional[str]:
-    """Repo root when *path* lies in a git main checkout, else None (linked worktree, bare, no repo)."""
+    """Repo root when *path* lies in a git main checkout, else None (linked worktree, no repo, allowed)."""
     p = Path(path)
     while not p.is_dir():
         if p.parent == p:
             return None
         p = p.parent
     out = _git(str(p), "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir")
-    if not out:
-        return None
-    parts = out.splitlines()
+    parts = out.splitlines() if out else []
     if len(parts) != 3:
-        return None
+        # Inside a .git directory there is no work tree: treat the repo as the owner (blocks .git edits).
+        out = _git(str(p), "rev-parse", "--path-format=absolute", "--git-common-dir")
+        common = os.path.realpath(out) if out else ""
+        root = os.path.dirname(common)
+        return root if os.path.basename(common) == ".git" and root not in _allowed_roots() else None
     top, git_dir, common = (os.path.realpath(x) for x in parts)
     if git_dir != common:
         return None  # linked worktree
@@ -94,22 +110,58 @@ def _resolve(path: str, base: str) -> str:
     return os.path.realpath(os.path.join(base, os.path.expanduser(path)))
 
 
+def _within(path: str, root: str) -> bool:
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def _slug(key: str) -> str:
+    return "task-" + (re.sub(r"[^A-Za-z0-9]", "", key or "")[:8] or "x")
+
+
+def _is_linked_worktree_of(wt: str, root: str) -> bool:
+    out = _git(wt, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
+    parts = out.splitlines() if out else []
+    return len(parts) == 2 and parts[0] != parts[1] and os.path.realpath(parts[1]) == os.path.realpath(os.path.join(root, ".git"))
+
+
+def ensure_worktree(root: str, key: str) -> str:
+    """Path of this session's worktree for *root*, creating it if needed. Raises RuntimeError on failure."""
+    with _lock:
+        known = _created.get((key, root))
+        wt = known or f"{root}-worktrees/{_slug(key)}"
+        if os.path.isdir(wt):
+            if not _is_linked_worktree_of(wt, root):
+                raise RuntimeError(f"{wt} exists but is not a worktree of {root}")
+        else:
+            branch = f"hermes/{_slug(key)}"
+            try:
+                created = _git(root, "worktree", "add", "-b", branch, wt, timeout=_ADD_TIMEOUT) is not None
+                if not created:  # branch already exists from an earlier run
+                    created = _git(root, "worktree", "add", wt, branch, timeout=_ADD_TIMEOUT) is not None
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("git worktree add timed out") from None
+            if not created or not os.path.isdir(wt):
+                raise RuntimeError("git worktree add failed")
+        _created[(key, root)] = wt
+        return wt
+
+
 def _is_mutating_command(cmd: str) -> bool:
-    if _REDIRECT.search(cmd):
+    if _REDIRECT_TARGET.search(cmd):
         return True
     for seg in _SEGMENT_SPLIT.split(cmd):
         try:
             words = shlex.split(seg)
         except ValueError:
             words = seg.split()
-        while words and ("=" in words[0] and not words[0].startswith("-")):
+        while words and "=" in words[0] and not words[0].startswith("-"):
             words = words[1:]  # VAR=value prefix
         if words and words[0] in {"sudo", "env", "command", "time"}:
             words = words[1:]
         if not words:
             continue
         if words[0] == "git":
-            sub = next((w for w in words[1:] if not w.startswith("-")), "")
+            sub = next((w for w in words[1:] if not w.startswith("-") and not os.path.isabs(w)), "")
             if sub in _GIT_MUTATORS:
                 return True
         elif words[0] in _FILE_MUTATORS:
@@ -119,62 +171,139 @@ def _is_mutating_command(cmd: str) -> bool:
     return False
 
 
-def _message(root: str, task_id: str) -> str:
-    slug = "task-" + (re.sub(r"[^A-Za-z0-9]", "", task_id or "")[:6] or "task")
-    wt = f"{root}-worktrees/{slug}"
-    return (
-        f"Blocked by worktree-guard: {root} is the main checkout. Do not edit or run git "
-        f"mutations there. Create an isolated worktree first: "
-        f"`git -C {root} worktree add -b hermes/{slug} {wt}` then use absolute paths under "
-        f"{wt} for write_file/patch and set terminal workdir to {wt}. "
-        f"Run tests and review `git diff` there; do not merge into the main checkout."
-    )
+def _command_paths(cmd: str, cwd: str) -> list[tuple[str, bool]]:
+    """(resolved path, was absolute/~) for path-looking tokens and redirect targets of a command."""
+    try:
+        words = shlex.split(cmd, posix=True)
+    except ValueError:
+        words = cmd.split()
+    words += _REDIRECT_TARGET.findall(cmd)
+    out = []
+    for w in words:
+        w = w.split("=", 1)[1] if w.startswith("--") and "=" in w else w
+        if "/" in w or w.startswith((".", "~")):
+            out.append((_resolve(w, cwd), w.startswith(("/", "~"))))
+    return out
 
 
-def _paths_for(tool_name: str, args: dict[str, Any], base: str) -> list[str]:
-    if tool_name in _FILE_TOOLS:
-        p = args.get("path") or args.get("file_path")
-        paths = [p] if isinstance(p, str) and p else []
-        patch = args.get("patch")
-        if isinstance(patch, str):  # V4A mode names files inside the patch body
-            paths += re.findall(r"^\*\*\* (?:Add|Update|Delete) File:\s*(.+)$", patch, re.M)
-            paths += re.findall(r"^\*\*\* Move to:\s*(.+)$", patch, re.M)
-        return [_resolve(x.strip(), base) for x in paths]
-    return []
+def _unsafe(msg: str) -> dict[str, str]:
+    return {"action": "block", "message": msg}
 
 
-def check(tool_name: str, args: dict[str, Any], task_id: str = "") -> Optional[str]:
-    """Block message, or None to allow. Raises nothing the caller must handle except git timeouts."""
+def _blocked_in(root: str, wt: str) -> str:
+    return (f"Blocked by worktree-guard: this call would modify the main checkout {root}. A worktree for this "
+            f"session is ready at {wt} (branch hermes/{os.path.basename(wt)}). Redo the call using absolute paths "
+            f"under {wt} and set terminal workdir to {wt}. Run the project's checks and review `git diff` there; "
+            f"do not merge into the main checkout.")
+
+
+def decide(tool_name: str, args: dict[str, Any], task_id: str = "", tool_call_id: str = "") -> Optional[dict]:
+    """Directive dict for pre_tool_call, or None to allow. Raises nothing but TimeoutExpired/RuntimeError."""
     if _disabled():
         return None
-    args = args or {}
+    args = dict(args or {})
     base = _base_cwd(task_id)
+    key = task_id or "default"
+
     if tool_name in _FILE_TOOLS:
-        for path in _paths_for(tool_name, args, base):
-            root = main_checkout_root(path)
-            if root:
-                return _message(root, task_id)
+        raw = args.get("path") or args.get("file_path")
+        v4a = args.get("patch") if isinstance(args.get("patch"), str) else ""
+        names = ([raw] if isinstance(raw, str) and raw else [])
+        names += [n.strip() for n in re.findall(r"^\*\*\* (?:Add|Update|Delete) File:\s*(.+)$", v4a, re.M)]
+        names += [n.strip() for n in re.findall(r"^\*\*\* Move to:\s*(.+)$", v4a, re.M)]
+        for name in names:
+            real = _resolve(name, base)
+            if _within(real, _PLUGIN_DIR):
+                return _unsafe("Blocked by worktree-guard: this plugin's own files are not editable by the agent.")
+            root = main_checkout_root(real)
+            if not root:
+                continue
+            rel = os.path.relpath(real, root)
+            wt = ensure_worktree(root, key)
+            if rel == ".git" or rel.startswith(".git" + os.sep) or v4a:
+                return _unsafe(_blocked_in(root, wt))
+            new_path = os.path.join(wt, rel)
+            _pending[tool_call_id or f"{key}:{tool_name}"] = (
+                f"[worktree-guard] Edit re-routed from {real} to {new_path}. Work in {wt} from now on; "
+                f"review `git diff` there before handing over. Never edit {root} directly.")
+            return {"action": "modify", "args": {"path": new_path}}
         return None
+
+    if tool_name == "read_file":  # once a session worktree exists, show its content, not the stale main copy
+        raw = args.get("path")
+        if isinstance(raw, str) and raw:
+            real = _resolve(raw, base)
+            root = main_checkout_root(real)
+            wt = _created.get((key, root)) if root else None
+            rel = os.path.relpath(real, root) if root else ""
+            if wt and not rel.startswith(".git"):
+                _pending[tool_call_id or f"{key}:{tool_name}"] = (
+                    f"[worktree-guard] Read from the session worktree: {os.path.join(wt, rel)} (not {real}).")
+                return {"action": "modify", "args": {"path": os.path.join(wt, rel)}}
+        return None
+
     if tool_name == "terminal":
-        cmd = args.get("command") or ""
+        cmd = args.get("command")
         if not isinstance(cmd, str) or not _is_mutating_command(cmd):
             return None
         workdir = args.get("workdir")
         cwd = _resolve(workdir, base) if isinstance(workdir, str) and workdir else base
-        root = main_checkout_root(cwd)
-        if root:
-            return _message(root, task_id)
+        cwd_root = main_checkout_root(cwd)
+        touched = set()
+        for path, absolute in _command_paths(cmd, cwd):
+            r = main_checkout_root(path)
+            if r and (absolute or r != cwd_root):
+                touched.add(r)
+        if not touched and not cwd_root:
+            return None
+        if touched:  # names main-checkout paths explicitly: cannot be rewritten safely
+            root = sorted(touched)[0]
+            return _unsafe(_blocked_in(root, ensure_worktree(root, key)))
+        wt = ensure_worktree(cwd_root, key)
+        new_cwd = os.path.normpath(os.path.join(wt, os.path.relpath(cwd, cwd_root)))
+        _pending[tool_call_id or f"{key}:{tool_name}"] = (
+            f"[worktree-guard] Command re-routed from {cwd} to {new_cwd}. Work in {wt} from now on; "
+            f"review `git diff` there before handing over. Never modify {cwd_root} directly.")
+        return {"action": "modify", "args": {"workdir": new_cwd}}
     return None
 
 
-def _hook(tool_name, args, task_id="", **kwargs):
+def _pre_tool_call(tool_name, args, task_id="", **kwargs):
     try:
-        msg = check(tool_name, args, task_id)
+        return decide(tool_name, args, task_id, kwargs.get("tool_call_id") or "")
     except subprocess.TimeoutExpired:
-        return {"action": "block", "message": "worktree-guard: git timed out while checking the target; failing closed."}
-    return {"action": "block", "message": msg} if msg else None
+        return _unsafe("worktree-guard: git timed out while checking the target; failing closed.")
+    except RuntimeError as exc:
+        return _unsafe(f"worktree-guard: could not prepare an isolated worktree ({exc}); not editing the main checkout.")
+
+
+def _transform_tool_result(tool_name, args, result, task_id="", **kwargs):
+    key = kwargs.get("tool_call_id") or f"{task_id or 'default'}:{tool_name}"
+    with _lock:
+        note = _pending.pop(key, None)
+    if note and isinstance(result, str):
+        return f"{result}\n{note}"
+    return None
+
+
+def _pre_verify(coding=False, attempt=0, changed_paths=None, **kwargs):
+    if attempt or _disabled():
+        return None
+    for (_key, root), wt in list(_created.items()):
+        if any(_within(os.path.realpath(p), os.path.realpath(wt)) for p in (changed_paths or [])):
+            return {"action": "continue", "message": (
+                f"Before handing over: in {wt} run the project's tests/lint for what you changed, then show "
+                f"`git -C {wt} diff --stat` and a short summary. Report any check you could not run. "
+                f"Do not merge into {root} or push.")}
+    return None
 
 
 def register(ctx):
-    ctx.register_hook("pre_tool_call", _hook)
-    logger.info("[worktree_guard_abelion] registered pre_tool_call guard")
+    if _disabled():
+        logger.warning("[worktree_guard_abelion] DISABLED by HERMES_WORKTREE_GUARD")
+    elif _allowed_roots():
+        logger.warning("[worktree_guard_abelion] repo roots exempt from the guard: %s", sorted(_allowed_roots()))
+    ctx.register_hook("pre_tool_call", _pre_tool_call)
+    ctx.register_hook("transform_tool_result", _transform_tool_result)
+    ctx.register_hook("pre_verify", _pre_verify)
+    logger.info("[worktree_guard_abelion] registered")

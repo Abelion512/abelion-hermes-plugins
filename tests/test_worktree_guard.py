@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import sys
@@ -8,130 +9,213 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import worktree_guard_abelion as wg  # noqa: E402
 
+ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
 
 def git(cwd, *a):
-    subprocess.run(["git", "-C", str(cwd), *a], check=True, capture_output=True,
-                   env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+    return subprocess.run(["git", "-C", str(cwd), *a], check=True, capture_output=True, text=True,
+                          env={**os.environ, **ENV}).stdout.strip()
 
 
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.repo = Path(self.tmp.name, "repo").resolve()
+        t = Path(self.tmp.name).resolve()
+        self.repo = t / "repo"
         self.repo.mkdir()
         git(self.repo, "init", "-q", "-b", "main")
+        (self.repo / "sub").mkdir()
         (self.repo / "a.txt").write_text("x")
+        (self.repo / "sub" / "b.txt").write_text("y")
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-qm", "init")
-        self.wt = Path(self.tmp.name, "repo-worktrees", "t1").resolve()
-        git(self.repo, "worktree", "add", "-q", "-b", "hermes/t1", str(self.wt))
-        self.plain = Path(self.tmp.name, "plain").resolve()
+        self.plain = t / "plain"
         self.plain.mkdir()
-        os.environ.pop("HERMES_WORKTREE_GUARD", None)
-        os.environ.pop("HERMES_WORKTREE_GUARD_ALLOW", None)
+        self.manual = t / "manual-wt"
+        git(self.repo, "worktree", "add", "-q", "-b", "manual", str(self.manual))
+        for k in ("HERMES_WORKTREE_GUARD", "HERMES_WORKTREE_GUARD_ALLOW"):
+            os.environ.pop(k, None)
         os.environ["TERMINAL_CWD"] = str(self.repo)
+        wg._created.clear()
+        wg._pending.clear()
 
-    def run_hook(self, tool, args, task="abc123xyz"):
-        return wg._hook(tool, args, task_id=task)
+    def hook(self, tool, args, task="abc123xyz", cid="c1"):
+        return wg._pre_tool_call(tool, args, task_id=task, tool_call_id=cid)
+
+    def wt(self, task="abc123xyz"):
+        return Path(f"{self.repo}-worktrees/task-{task[:8]}")
+
+    def assertMainClean(self):
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
 
 
 class FileTools(Base):
-    def test_write_in_main_blocked_with_fix(self):
-        r = self.run_hook("write_file", {"path": str(self.repo / "a.txt"), "content": "y"})
-        self.assertEqual(r["action"], "block")
-        self.assertIn("git -C", r["message"])
-        self.assertIn("worktree add", r["message"])
-        self.assertIn("task-abc123", r["message"])
+    def test_write_in_main_is_rerouted_into_new_worktree(self):
+        r = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": "y"})
+        self.assertEqual(r, {"action": "modify", "args": {"path": str(self.wt() / "a.txt")}})
+        self.assertTrue((self.wt() / "a.txt").exists())
+        self.assertEqual(git(self.wt(), "branch", "--show-current"), "hermes/task-abc123xy")
+        self.assertMainClean()
 
-    def test_new_file_in_new_subdir_of_main_blocked(self):
-        self.assertTrue(self.run_hook("write_file", {"path": str(self.repo / "n/x.py"), "content": ""}))
+    def test_nested_new_file_and_reuse(self):
+        r1 = self.hook("patch", {"path": "sub/new/n.py", "old_string": "", "new_string": ""})
+        self.assertEqual(r1["args"]["path"], str(self.wt() / "sub/new/n.py"))
+        r2 = self.hook("write_file", {"path": str(self.repo / "sub" / "b.txt"), "content": ""})
+        self.assertEqual(r2["args"]["path"], str(self.wt() / "sub/b.txt"))
+        self.assertEqual(git(self.repo, "worktree", "list").count("\n"), 2)  # main, manual, one session worktree
 
-    def test_relative_path_uses_session_cwd(self):
-        self.assertTrue(self.run_hook("patch", {"path": "a.txt", "old_string": "x", "new_string": "y"}))
+    def test_separate_sessions_get_separate_worktrees(self):
+        a = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}, task="aaaaaaaa1")
+        b = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}, task="bbbbbbbb2")
+        self.assertNotEqual(a["args"]["path"], b["args"]["path"])
 
-    def test_linked_worktree_allowed(self):
-        self.assertIsNone(self.run_hook("write_file", {"path": str(self.wt / "a.txt"), "content": "y"}))
+    def test_notice_reaches_the_model_once(self):
+        self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}, cid="k1")
+        out = wg._transform_tool_result("write_file", {}, "ok", task_id="abc123xyz", tool_call_id="k1")
+        self.assertIn("re-routed", out)
+        self.assertIsNone(wg._transform_tool_result("write_file", {}, "ok", task_id="abc123xyz", tool_call_id="k1"))
 
-    def test_worktree_inside_main_tree_allowed(self):
+    def test_absolute_path_into_main_from_worktree_cwd_still_rerouted(self):
+        os.environ["TERMINAL_CWD"] = str(self.manual)
+        r = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        self.assertEqual(r["action"], "modify")
+
+    def test_linked_worktrees_allowed(self):
+        self.assertIsNone(self.hook("write_file", {"path": str(self.manual / "a.txt"), "content": ""}))
+
+    def test_nested_linked_worktree_inside_main_dir_allowed(self):
         inner = self.repo / ".worktrees" / "i"
-        git(self.repo, "worktree", "add", "-q", "-b", "hermes/i", str(inner))
-        self.assertIsNone(self.run_hook("write_file", {"path": str(inner / "a.txt"), "content": "y"}))
+        git(self.repo, "worktree", "add", "-q", "-b", "inner", str(inner))
+        self.assertIsNone(self.hook("write_file", {"path": str(inner / "a.txt"), "content": ""}))
 
-    def test_non_repo_allowed(self):
-        self.assertIsNone(self.run_hook("write_file", {"path": str(self.plain / "f"), "content": ""}))
+    def test_non_repo_allowed_by_policy(self):
+        self.assertIsNone(self.hook("write_file", {"path": str(self.plain / "f"), "content": ""}))
 
-    def test_symlink_into_main_blocked(self):
+    def test_symlink_and_traversal_into_main_are_caught(self):
         link = self.plain / "ln"
         link.symlink_to(self.repo)
-        self.assertTrue(self.run_hook("write_file", {"path": str(link / "a.txt"), "content": ""}))
+        self.assertEqual(self.hook("write_file", {"path": str(link / "a.txt"), "content": ""})["action"], "modify")
+        p = str(self.manual / ".." / "repo" / "a.txt")
+        self.assertEqual(self.hook("write_file", {"path": p, "content": ""})["action"], "modify")
+        self.assertMainClean()
 
-    def test_traversal_into_main_blocked(self):
-        p = str(self.wt / ".." / ".." / "repo" / "a.txt")
-        self.assertTrue(self.run_hook("write_file", {"path": p, "content": ""}))
-
-    def test_v4a_patch_body_checked(self):
+    def test_git_dir_and_v4a_are_blocked_with_worktree_path(self):
+        r = self.hook("write_file", {"path": str(self.repo / ".git" / "config"), "content": ""})
+        self.assertEqual(r["action"], "block")
         body = "*** Begin Patch\n*** Update File: %s\n@@\n-x\n+y\n*** End Patch" % (self.repo / "a.txt")
-        self.assertTrue(self.run_hook("patch", {"mode": "patch", "patch": body}))
+        r = self.hook("patch", {"mode": "patch", "patch": body})
+        self.assertEqual(r["action"], "block")
+        self.assertIn(str(self.wt()), r["message"])
+        self.assertMainClean()
 
-    def test_read_file_never_blocked(self):
-        self.assertIsNone(self.run_hook("read_file", {"path": str(self.repo / "a.txt")}))
+    def test_plugin_own_files_protected(self):
+        r = self.hook("write_file", {"path": os.path.join(wg._PLUGIN_DIR, "__init__.py"), "content": ""})
+        self.assertEqual(r["action"], "block")
+
+    def test_read_file_untouched_until_worktree_exists_then_follows_it(self):
+        self.assertIsNone(self.hook("read_file", {"path": str(self.repo / "a.txt")}))
+        self.assertFalse(self.wt().exists())
+        self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        r = self.hook("read_file", {"path": str(self.repo / "a.txt")})
+        self.assertEqual(r["args"]["path"], str(self.wt() / "a.txt"))
+        self.assertIsNone(self.hook("read_file", {"path": str(self.plain / "x")}))
 
 
 class Terminal(Base):
-    def test_git_commit_in_main_blocked(self):
-        self.assertTrue(self.run_hook("terminal", {"command": "git commit -am x"}))
+    def test_commit_in_main_rerouted_by_workdir(self):
+        r = self.hook("terminal", {"command": "git commit -am x"})
+        self.assertEqual(r, {"action": "modify", "args": {"workdir": str(self.wt())}})
 
-    def test_git_commit_with_workdir_in_worktree_allowed(self):
-        self.assertIsNone(self.run_hook("terminal", {"command": "git commit -am x", "workdir": str(self.wt)}))
+    def test_git_add_dot_and_subdir_cwd(self):
+        r = self.hook("terminal", {"command": "git add .", "workdir": str(self.repo / "sub")})
+        self.assertEqual(r["args"]["workdir"], str(self.wt() / "sub"))
 
-    def test_workdir_in_main_overrides_safe_default(self):
-        os.environ["TERMINAL_CWD"] = str(self.wt)
-        self.assertTrue(self.run_hook("terminal", {"command": "rm a.txt", "workdir": str(self.repo)}))
+    def test_absolute_main_path_from_worktree_cwd_blocked(self):
+        r = self.hook("terminal", {"command": f"rm {self.repo}/a.txt", "workdir": str(self.manual)})
+        self.assertEqual(r["action"], "block")
+        self.assertTrue((self.repo / "a.txt").exists())
 
-    def test_redirect_blocked_but_devnull_and_stderr_merge_ok(self):
-        self.assertTrue(self.run_hook("terminal", {"command": "echo hi > out.txt"}))
-        self.assertIsNone(self.run_hook("terminal", {"command": "ls 2>&1"}))
-        self.assertIsNone(self.run_hook("terminal", {"command": "make 2>/dev/null"}))
+    def test_cd_into_main_then_mutate_blocked(self):
+        os.environ["TERMINAL_CWD"] = str(self.manual)
+        self.assertEqual(self.hook("terminal", {"command": f"cd {self.repo} && git add -A"})["action"], "block")
+        self.assertEqual(self.hook("terminal", {"command": "echo hi > ../repo/o.txt"})["action"], "block")
 
-    def test_sed_inplace_and_chain_blocked(self):
-        self.assertTrue(self.run_hook("terminal", {"command": "sed -i s/x/y/ a.txt"}))
-        self.assertTrue(self.run_hook("terminal", {"command": "cd /tmp && git add -A"}))
+    def test_git_dash_C_main_blocked(self):
+        os.environ["TERMINAL_CWD"] = str(self.plain)
+        self.assertEqual(self.hook("terminal", {"command": f"git -C {self.repo} commit -am x"})["action"], "block")
 
-    def test_read_only_commands_allowed(self):
-        for c in ["git status", "git diff", "git log -3", "pytest -q", "ls -la", "cat a.txt | wc -l",
-                  "git worktree add -b hermes/z ../z", "FOO=1 git status"]:
-            self.assertIsNone(self.run_hook("terminal", {"command": c}), c)
+    def test_read_only_and_other_cwds_allowed(self):
+        for c in ["git status", "git diff", "git log -3", "ls -la", "cat a.txt | wc -l", "FOO=1 git status",
+                  "git worktree add -b z ../z", "ls 2>&1", "make 2>/dev/null"]:
+            self.assertIsNone(self.hook("terminal", {"command": c}), c)
+        self.assertIsNone(self.hook("terminal", {"command": "git commit -am x", "workdir": str(self.manual)}))
+        self.assertIsNone(self.hook("terminal", {"command": "rm f", "workdir": str(self.plain)}))
+        self.assertMainClean()
 
-    def test_non_repo_cwd_allowed(self):
-        self.assertIsNone(self.run_hook("terminal", {"command": "rm f", "workdir": str(self.plain)}))
+    def test_redirect_and_sed_in_main_rerouted(self):
+        self.assertEqual(self.hook("terminal", {"command": "echo hi > out.txt"})["action"], "modify")
+        self.assertEqual(self.hook("terminal", {"command": "sed -i s/x/y/ a.txt"})["action"], "modify")
 
 
-class Switches(Base):
-    def test_off(self):
-        os.environ["HERMES_WORKTREE_GUARD"] = "off"
-        self.assertIsNone(self.run_hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}))
+class FailSafe(Base):
+    def test_creation_failure_blocks_and_leaves_main_untouched(self):
+        orig = wg._git
+        wg._git = lambda cwd, *a, **k: None if a[:2] == ("worktree", "add") else orig(cwd, *a, **k)
+        self.addCleanup(setattr, wg, "_git", orig)
+        r = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        self.assertEqual(r["action"], "block")
+        self.assertMainClean()
 
-    def test_allowlist(self):
-        os.environ["HERMES_WORKTREE_GUARD_ALLOW"] = str(self.repo)
-        self.assertIsNone(self.run_hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}))
+    def test_squatter_directory_blocks(self):
+        self.wt().mkdir(parents=True)
+        r = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        self.assertEqual(r["action"], "block")
 
     def test_git_timeout_fails_closed(self):
         orig = wg._git
+
         def boom(*a, **k):
             raise subprocess.TimeoutExpired("git", 3)
         wg._git = boom
         self.addCleanup(setattr, wg, "_git", orig)
-        r = self.run_hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
-        self.assertEqual(r["action"], "block")
+        self.assertEqual(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})["action"], "block")
 
-    def test_register(self):
-        calls = []
+
+class Switches(Base):
+    def test_off_and_allow(self):
+        os.environ["HERMES_WORKTREE_GUARD"] = "off"
+        self.assertIsNone(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}))
+        os.environ.pop("HERMES_WORKTREE_GUARD")
+        os.environ["HERMES_WORKTREE_GUARD_ALLOW"] = str(self.repo)
+        self.assertIsNone(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""}))
+
+    def test_weakening_is_logged_at_start(self):
         class Ctx:
-            def register_hook(self, name, fn): calls.append(name)
+            def register_hook(self, *a): pass
+        os.environ["HERMES_WORKTREE_GUARD"] = "off"
+        with self.assertLogs(wg.logger, level=logging.WARNING) as cm:
+            wg.register(Ctx())
+        self.assertIn("DISABLED", cm.output[0])
+
+    def test_registers_three_hooks(self):
+        names = []
+
+        class Ctx:
+            def register_hook(self, n, f): names.append(n)
         wg.register(Ctx())
-        self.assertEqual(calls, ["pre_tool_call"])
+        self.assertEqual(names, ["pre_tool_call", "transform_tool_result", "pre_verify"])
+
+
+class Handoff(Base):
+    def test_pre_verify_nudges_once_for_session_worktree_edits(self):
+        self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        changed = [str(self.wt() / "a.txt")]
+        r = wg._pre_verify(coding=True, attempt=0, changed_paths=changed)
+        self.assertEqual(r["action"], "continue")
+        self.assertIn("diff --stat", r["message"])
+        self.assertIsNone(wg._pre_verify(coding=True, attempt=1, changed_paths=changed))
+        self.assertIsNone(wg._pre_verify(coding=True, attempt=0, changed_paths=[str(self.plain / "x")]))
 
 
 if __name__ == "__main__":

@@ -1,34 +1,50 @@
 # worktree-guard-abelion
 
-Keeps Hermes out of a repo's main checkout. When the agent tries to edit a file
-or run a mutating git/file command there, the tool call is blocked and the
-message tells it the exact `git worktree add` command to run, then to work in
-that worktree and review `git diff` before handing over. Nothing is merged.
+Keeps Hermes out of a repo's main checkout, automatically.
 
-Blocked in a main checkout: `write_file`, `patch` (including V4A bodies), and
-`terminal` commands that look like writes (`git add/commit/checkout/reset/...`,
-`rm/mv/cp/touch/mkdir/tee`, `sed -i`, `>` redirects).
-Allowed: linked worktrees, paths outside any git repo, read-only commands.
+When a call would modify a git main checkout, the plugin creates a linked
+worktree for the session (`<repo>-worktrees/task-<id>`, branch
+`hermes/task-<id>`, from the main checkout's HEAD) and re-routes the call into
+it. The model is told in the tool result. Nothing is merged or pushed.
 
-## Install and enable
+| Call | In a main checkout |
+|---|---|
+| `write_file`, `patch` | path re-routed into the session worktree |
+| `terminal` that writes (`git add/commit/checkout/reset/...`, `rm/mv/cp/touch/mkdir/tee`, `sed -i`, `>`) | `workdir` re-routed into the worktree |
+| `read_file` | follows the worktree once it exists |
+| V4A patch bodies, `.git` internals, commands naming absolute main-checkout paths, this plugin's own files | blocked, message names the worktree to use |
+| worktree cannot be created (git error, 25s timeout, squatting directory) | blocked (fail closed) |
 
-    hermes plugins install --enable Abelion512/abelion-hermes-plugins/worktree_guard_abelion
+Allowed untouched: linked worktrees, paths outside any git repo (policy: only
+git repos are protected), read-only commands.
 
-(or copy the folder to `~/.hermes/plugins/` and add `worktree-guard-abelion`
-to `plugins.enabled`). Restart Hermes.
+Handoff: after a turn that edited files in the session worktree, `pre_verify`
+asks the agent once to run the project's checks and show `git diff --stat`
+before handing over.
 
-## Switches
+## Install
 
-- `HERMES_WORKTREE_GUARD=off` disables it.
-- `HERMES_WORKTREE_GUARD_ALLOW=/path/a:/path/b` lets those repo roots be edited directly.
+    hermes plugins install --enable --ref <40-char commit SHA> Abelion512/abelion-hermes-plugins/worktree_guard_abelion
+
+`--ref` needs the full SHA. Add `--force` to move an already installed copy.
+Private repo: Hermes uses `GITHUB_TOKEN`, `gh auth`, or your git credential
+helper. Restart Hermes afterwards.
+
+## Switches (Hermes process env, logged at start-up when set)
+
+- `HERMES_WORKTREE_GUARD=off` disables everything.
+- `HERMES_WORKTREE_GUARD_ALLOW=/path/a:/path/b` exempts those repo roots.
 
 ## Limits
 
-This is a policy hook, not an OS sandbox. The terminal check is a pattern
-match, so a creative shell command can still write elsewhere. A git timeout
-(3s) blocks the call (fail closed). Enforcement covers CLI, gateway and
-dashboard sessions alike because it hooks `pre_tool_call`.
+A policy hook, not an OS sandbox. The terminal check is a pattern match;
+`execute_code` and creative shell commands can still write anywhere (and
+running tests executes arbitrary code). The worktree starts from HEAD, so
+uncommitted changes in the main checkout are not in it. Needs a Hermes with the
+`pre_tool_call` `modify`/`block` directives, `transform_tool_result` and
+`pre_verify` hooks (present in hermes-agent 67491b50).
 
-## Test
+## Tests
 
     python3 -m unittest discover -s tests -v
+    HERMES_SRC=/path/to/hermes-agent python tests/e2e_dispatch.py

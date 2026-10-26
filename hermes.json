@@ -30,6 +30,11 @@
       "description": "pre_llm_call + post_tool_call: RSI lesson extraction"
     },
     {
+      "id": "worktree-guard-abelion",
+      "path": "worktree_guard_abelion",
+      "description": "pre_tool_call: block edits and git mutations in a main checkout, steer to a git worktree"
+    },
+    {
       "id": "9router",
       "path": "model-providers/9router",
       "description": "9Router model provider (110+ models, oc/*, mmf/*)"

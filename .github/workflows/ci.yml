@@ -3,34 +3,125 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly (Mon 02:00 UTC): a new CVE in an unchanged dependency is still caught.
+    - cron: "0 2 * * 1"
 
 # Least privilege: read-only checkout, no packages/id-token/deploy scopes.
 permissions:
   contents: read
 
 jobs:
-  tests:
+  # Finds every plugin folder (any dir with a plugin.yaml). Runs only the plugins
+  # touched by the change. A change outside any plugin folder (shared files such as
+  # workflows, hermes.json, root tests), a schedule or a manual run checks all of them.
+  detect:
     runs-on: ubuntu-latest
+    outputs:
+      plugins: ${{ steps.find.outputs.plugins }}
     steps:
       # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - id: find
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          all=$(find . -name plugin.yaml -not -path './.git/*' -printf '%h\n' | sed 's|^\./||' | sort)
+          base=""
+          [ "$EVENT" = pull_request ] && base="$PR_BASE"
+          [ "$EVENT" = push ] && base="$PUSH_BEFORE"
+          changed=""
+          if [ -n "$base" ] && ! echo "$base" | grep -qE '^0+$'; then
+            changed=$(git diff --name-only "$base" HEAD 2>/dev/null) || base=""
+          else
+            base=""
+          fi
+          if [ -z "$base" ]; then
+            sel="$all"
+          else
+            sel=""
+            shared=0
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              hit=""
+              for d in $all; do
+                case "$f" in "$d"/*) hit="$d"; break;; esac
+              done
+              if [ -n "$hit" ]; then sel="$sel$hit"$'\n'; else shared=1; fi
+            done <<< "$changed"
+            [ "$shared" = 1 ] && sel="$all"
+          fi
+          json=$(printf '%s\n' "$sel" | sed '/^$/d' | sort -u | jq -R . | jq -sc .)
+          echo "plugins=$json" | tee -a "$GITHUB_OUTPUT"
+
+  plugin:
+    needs: detect
+    if: needs.detect.outputs.plugins != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJson(needs.detect.outputs.plugins) }}
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       # actions/setup-python v7.1.0 (3.14 matches the pinned Hermes managed env)
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.14"
-      - run: python -m pip install -r screen/tests/requirements-test.txt
-      - run: python -m pytest screen/tests -q
+      - name: install test deps and pip-audit
+        env:
+          P: ${{ matrix.plugin }}
+        run: |
+          python -m pip install pip-audit pytest
+          for f in "$P"/tests/requirements*.txt; do
+            [ -f "$f" ] && python -m pip install -r "$f"
+          done
+          true
+      - name: syntax check
+        env:
+          P: ${{ matrix.plugin }}
+        run: python -m compileall -q "$P"
+      - name: tests
+        env:
+          P: ${{ matrix.plugin }}
+        run: |
+          if [ -d "$P/tests" ]; then
+            python -m pytest "$P/tests" -q
+          else
+            echo "::notice title=$P::no tests in this plugin yet (syntax check only)"
+          fi
+      - name: dependency audit
+        env:
+          P: ${{ matrix.plugin }}
+        run: |
+          found=0
+          while IFS= read -r f; do
+            found=1
+            echo "pip-audit $f"
+            pip-audit -r "$f"
+          done < <(find "$P" -name 'requirements*.txt' -o -name 'plugin-requirements.txt' | sort -u)
+          [ "$found" = 1 ] || echo "no requirements files in $P"
 
-  dep-audit:
+  # Tests that live in a root tests/ folder (not inside a plugin folder).
+  root-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.14"
-      - run: python -m pip install pip-audit
-      # Audits the plugin's declared Python deps (mirror of plugin.yaml).
-      - run: pip-audit -r screen/plugin-requirements.txt
+      - run: |
+          if [ -d tests ]; then
+            python -m pip install pytest
+            python -m pytest tests -q
+          else
+            echo "no root tests/ folder"
+          fi
 
   secret-scan:
     runs-on: ubuntu-latest

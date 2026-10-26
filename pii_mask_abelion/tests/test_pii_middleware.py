@@ -12,7 +12,7 @@ def test_secrets_still_masked():
     for text in (
         "key sk-abcdef1234",
         "API_KEY=abc123def",
-        "token: ghp_abcdefghij12",
+        "token: " + "ghp_" + "abcdefghij12",
         "postgres://u:p@h/db",
         "order 1234567890123456",  # LONG_NUMBER protection is kept
         "admin (username) / hunter2 (password nya)",

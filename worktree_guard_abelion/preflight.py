@@ -8,6 +8,7 @@ Anything else = do NOT enable: on an unsupported Hermes the guard could silently
     python3 preflight.py          # finds Hermes' Python itself; or run it with Hermes' own python
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +18,24 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
+_PY_NAME = re.compile(r"^python(3(\.\d+)?)?$")
+
+
+def _is_python(path):
+    """Only a real interpreter may be probed or re-exec'd: never a shell (`sh -c "import x"` runs ImageMagick's
+    `import`, and `sh file.py` runs Python source as shell)."""
+    return bool(_PY_NAME.match(os.path.basename(path))) and os.access(path, os.X_OK)
+
+
+def _imports_hermes(py):
+    try:
+        return subprocess.run([py, "-c", "import hermes_cli"], capture_output=True, timeout=60).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _find_hermes_python():
+    """None if this interpreter already imports Hermes, a Python path that does, or "none"."""
     try:
         import hermes_cli  # noqa: F401
         return None
@@ -26,14 +44,25 @@ def _find_hermes_python():
     cands = []
     exe = shutil.which("hermes")
     if exe:
-        first = Path(exe).resolve().read_text(errors="ignore").splitlines()[:1] if Path(exe).resolve().is_file() else []
-        if first and first[0].startswith("#!") and "env" not in first[0]:
-            cands.append(first[0][2:].split()[0])
+        real = Path(exe).resolve()
+        try:
+            text = real.read_text(errors="ignore") if real.is_file() and real.stat().st_size < 200_000 else ""
+        except OSError:
+            text = ""
+        lines = text.splitlines()
+        if lines and lines[0].startswith("#!"):
+            cands.append(lines[0][2:].split()[0])
+        cands += re.findall(r"(/[^\s\"'`$;|&]+/python3?(?:\.\d+)?)\b", text)  # shell wrapper that execs a venv python
+        cands += [str(real.parent / "python3"), str(real.parent / "python")]
     home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
     for sub in ("hermes-agent/venv/bin/python", "hermes-agent/.venv/bin/python"):
         cands.append(str(home / sub))
+    seen = set()
     for c in cands:
-        if Path(c).exists() and subprocess.run([c, "-c", "import hermes_cli"], capture_output=True).returncode == 0:
+        if c in seen:
+            continue
+        seen.add(c)
+        if _is_python(c) and _imports_hermes(c):
             return c
     return "none"
 
@@ -41,10 +70,10 @@ def _find_hermes_python():
 def main() -> int:
     py = _find_hermes_python()
     if py == "none":
-        print("FAIL: cannot find a Python that can import hermes_cli. Run this file with Hermes' own Python.")
+        print("FAIL: cannot find a Python that can import hermes_cli. Run it with Hermes' own Python: <hermes python> preflight.py")
         return 2
     if py:
-        return subprocess.call([py, str(Path(__file__).resolve())])
+        return subprocess.call([py, str(Path(__file__).resolve())])  # py is verified by _is_python
 
     tmp = Path(tempfile.mkdtemp(prefix="wg-preflight-")).resolve()
     home = tmp / "home"

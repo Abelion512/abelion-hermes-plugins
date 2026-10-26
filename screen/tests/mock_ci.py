@@ -29,6 +29,9 @@ class MockUpstream:
         self.display_conns = {}
         # When set, display_ws accepts then closes with this code.
         self.close_display_with = None
+        # When True, the NEXT lease.release fails once with 5300 "not minted"
+        # (as if the upstream connection had just reconnected mid-call).
+        self.fail_next_release_not_minted = False
         self._next_conn = 0
 
     def public_view(self):
@@ -91,6 +94,11 @@ class MockUpstream:
                     self.since, self.reason = time.time(), str(p.get("reason") or "")
                 await ws.send_str(json.dumps(self._ok(rid, {"lease": self.public_view()})))
             elif method == "display.lease.release":
+                if self.fail_next_release_not_minted:
+                    self.fail_next_release_not_minted = False
+                    await ws.send_str(json.dumps(self._err(
+                        rid, "viewer_id was not minted for this connection; call display.observe first")))
+                    continue
                 vid = str(p.get("viewer_id") or "").strip() or None
                 force = bool(p.get("force"))
                 if vid is not None and not force and vid not in minted:

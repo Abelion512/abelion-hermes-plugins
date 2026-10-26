@@ -116,6 +116,19 @@ def test_foreign_live_holder_not_released_by_plain_hand_back(plugin, mock):
     assert mock.holder == "human"
 
 
+def test_force_survives_reconnect_retry(plugin, mock):
+    """Regression: force hand-back raced with an upstream reconnect must not
+    degrade to a bare release (refused while a human holds). The first call
+    hits 5300; the retry after re-observe must still carry force:true."""
+    _observe(plugin)
+    assert _lease(plugin, "acquire").json()["we_hold"] is True
+    mock.fail_next_release_not_minted = True
+    j = _lease(plugin, "release", {"force": True}).json()
+    assert j["holder"] == "agent", j
+    assert j["forced"] is True
+    assert mock.holder == "agent"
+
+
 def test_viewer_identity_stable_across_reload(plugin):
     """Reload must reuse the id minted by THIS connection so a held lease
     survives a tab reload (we_hold stays true)."""

@@ -1,4 +1,4 @@
-screen (v0.1-20261024) - Screen plugin untuk dashboard Hermes
+screen (v0.6.1-20261025) - Screen plugin untuk dashboard Hermes
 
 Isi: menu SCREEN di sidebar dashboard Hermes - pantau layar Bot Screen
 (virtual desktop + browser milik agent), Take over untuk klik/ketik,

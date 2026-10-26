@@ -1,8 +1,21 @@
 """Spin up the mock upstream (one per session, keeps lease state) and the
 plugin FastAPI app (per test, restartable = a dashboard restart)."""
-import asyncio, os, socket, sys, threading, time
+import asyncio, os, socket, sys, threading, time, types
 
 import pytest
+
+@pytest.fixture(autouse=True)
+def _core_ws_auth_stub(monkeypatch):
+    """hermes_cli is not installed in the test harness. Production now FAILS
+    CLOSED when the core WS auth module is missing, so tests inject a stub
+    that admits; the gate test replaces it with a denying one."""
+    fake_chat = types.ModuleType("hermes_cli.web_server_chat")
+    fake_chat._ws_auth_ok = lambda ws: True
+    fake_pkg = types.ModuleType("hermes_cli")
+    fake_pkg.web_server_chat = fake_chat
+    monkeypatch.setitem(sys.modules, "hermes_cli", fake_pkg)
+    monkeypatch.setitem(sys.modules, "hermes_cli.web_server_chat", fake_chat)
+
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dashboard"))
 

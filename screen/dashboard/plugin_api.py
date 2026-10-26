@@ -335,8 +335,11 @@ async def lease(request: Request, action: str):
                 observed = await _rpc_call(request, "display.observe")
                 _ticket = observed.get("ticket")
                 _viewer_id = observed.get("viewer_id")
+                # Retry with the SAME intent: a forced release must not
+                # degrade into a bare one (refused while a human holds).
+                retry_params = {"force": True} if force else {"viewer_id": _viewer_id}
                 result = await _rpc_call(request, f"display.lease.{action}",
-                                         {"viewer_id": _viewer_id})
+                                         retry_params)
             except UpstreamError as e2:
                 return _err(e2)
         else:
@@ -359,11 +362,17 @@ async def lease(request: Request, action: str):
 
 def _ws_upgrade_authorized(ws: WebSocket) -> bool:
     """Gate on the dashboard's canonical WS auth (web_server_chat._ws_auth_ok)
-    so this endpoint can never drift from core auth."""
+    so this endpoint can never drift from core auth. Fails CLOSED when the
+    core module is unavailable."""
     try:
         from hermes_cli import web_server_chat as _ws
     except Exception:
-        return True  # bare-FastAPI test harness
+        # FAIL CLOSED: this check is the ONLY gate on the display WebSocket
+        # (HTTP middleware does not run for WS upgrades). If the core module
+        # cannot be imported - e.g. a Hermes update renames it - deny, never
+        # silently open. The test harness injects a stub hermes_cli instead.
+        log.warning("screen: core WS auth module unavailable; denying upgrade")
+        return False
     return bool(_ws._ws_auth_ok(ws))
 
 

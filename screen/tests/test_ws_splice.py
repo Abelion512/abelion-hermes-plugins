@@ -45,6 +45,23 @@ def test_ws_auth_gate_delegates_to_core_check(plugin, monkeypatch):
         pass
 
 
+def test_ws_auth_fails_closed_without_core_module(plugin, monkeypatch):
+    """Production boundary: if hermes_cli.web_server_chat cannot be imported
+    (e.g. a Hermes update renames it), the display WS must be REFUSED - never
+    fail open - even after a valid /observe."""
+    _observe(plugin)
+    monkeypatch.delitem(sys.modules, "hermes_cli", raising=False)
+    monkeypatch.delitem(sys.modules, "hermes_cli.web_server_chat", raising=False)
+    try:
+        ws = websocket.create_connection(_ws_url(plugin), timeout=5)
+        ws.recv()
+        raise AssertionError("upgrade must be refused when core auth is missing")
+    except websocket.WebSocketBadStatusException:
+        pass  # handshake rejected (server closes before accept)
+    except websocket.WebSocketConnectionClosedException:
+        pass
+
+
 def test_splice_echo_and_clean_close(plugin, mock):
     _observe(plugin)
     ws = websocket.create_connection(_ws_url(plugin), timeout=5)

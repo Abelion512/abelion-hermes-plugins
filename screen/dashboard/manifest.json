@@ -3,7 +3,7 @@
   "label": "Screen",
   "description": "Live Bot Screen view with Take over / Hand back — watch the agent's virtual desktop and browser, take control when needed, hand it back",
   "icon": "Eye",
-  "version": "0.1.0",
+  "version": "0.6.1",
   "tab": {
     "path": "/screen",
     "position": "end"

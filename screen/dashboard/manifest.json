@@ -1,0 +1,14 @@
+{
+  "name": "screen",
+  "label": "Screen",
+  "description": "Live Bot Screen view with Take over / Hand back — watch the agent's virtual desktop and browser, take control when needed, hand it back",
+  "icon": "Eye",
+  "version": "0.6.3",
+  "tab": {
+    "path": "/screen",
+    "position": "end"
+  },
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}

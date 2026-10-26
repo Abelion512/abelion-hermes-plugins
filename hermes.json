@@ -33,6 +33,11 @@
       "id": "9router",
       "path": "model-providers/9router",
       "description": "9Router model provider (110+ models, oc/*, mmf/*)"
+    },
+    {
+      "id": "screen",
+      "path": "screen",
+      "description": "dashboard plugin: live Bot Screen viewer + Take over / Hand back (noVNC)"
     }
   ]
 }

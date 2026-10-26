@@ -1,0 +1,25 @@
+name: labeler
+
+# pull_request_target runs the workflow file from the base branch with write access.
+# Safe here because nothing from the PR is checked out or executed: labeler only
+# reads the list of changed file names and the config from the base branch.
+on:
+  pull_request_target:
+
+permissions:
+  contents: read
+
+jobs:
+  label:
+    # Dependabot PRs get a read-only token here; their labels are set in dependabot.yml.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # add labels to the PR
+      issues: write         # create labels that do not exist yet
+    steps:
+      # actions/labeler v7.0.0
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13
+        with:
+          sync-labels: true

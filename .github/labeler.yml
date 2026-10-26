@@ -1,0 +1,34 @@
+# Applied by .github/workflows/labeler.yml (actions/labeler). Label = plugin folder.
+screen:
+  - changed-files:
+      - any-glob-to-any-file: "screen/**"
+shield:
+  - changed-files:
+      - any-glob-to-any-file: "shield_abelion/**"
+pii-mask:
+  - changed-files:
+      - any-glob-to-any-file: "pii_mask_abelion/**"
+output-redact:
+  - changed-files:
+      - any-glob-to-any-file: "output_redact_abelion/**"
+tool-context:
+  - changed-files:
+      - any-glob-to-any-file: "tool_context_abelion/**"
+rsi-learn:
+  - changed-files:
+      - any-glob-to-any-file: "rsi_learn_abelion/**"
+9router:
+  - changed-files:
+      - any-glob-to-any-file: "model-providers/9router/**"
+worktree-guard:
+  - changed-files:
+      - any-glob-to-any-file: "worktree_guard_abelion/**"
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/dependabot.yml"
+          - "**/requirements*.txt"
+          - "**/plugin-requirements.txt"

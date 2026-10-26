@@ -11,6 +11,7 @@ Abelion security, context, and provider plugins for [Hermes Agent](https://githu
 | `output-redact-abelion` | `output_redact_abelion/` | transform_llm_output | Redact credentials from AI response |
 | `tool-context-abelion` | `tool_context_abelion/` | pre_llm_call | Inject datetime + tool reminder + execution mandate |
 | `rsi-learn-abelion` | `rsi_learn_abelion/` | pre_llm_call, post_tool_call | RSI lesson extraction and decision layer |
+| `worktree-guard-abelion` | `worktree_guard_abelion/` | pre_tool_call | Block edits/git mutations in a repo's main checkout; steer the agent to a git worktree |
 | `9router` | `model-providers/9router/` | provider profile | 9Router multi-model gateway (110+ models) |
 
 ## Install

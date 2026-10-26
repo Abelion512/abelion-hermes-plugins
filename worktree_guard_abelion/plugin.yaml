@@ -1,0 +1,9 @@
+name: worktree-guard-abelion
+description: "pre_tool_call: refuse edits and git mutations in a repo's main checkout; tell the agent to work in a linked git worktree instead."
+version: 0.1.0
+author: Abelion
+kind: standalone
+metadata:
+  hermes:
+    category: security
+    tags: [git, worktree, guard, pre-tool]

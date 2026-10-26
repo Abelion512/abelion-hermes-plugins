@@ -54,7 +54,9 @@ A policy hook, not an OS sandbox. Covered: `write_file`, `patch`, `read_file`,
 computer-use input) and creative shell commands the pattern match misses
 (`python -c`, `perl -i`, `dd`, ...). Running tests executes arbitrary code.
 `execute_code` is blocked outright while the session cwd is a main checkout,
-because arbitrary Python cannot be re-routed. The worktree starts from HEAD, so
+because arbitrary Python cannot be re-routed. Where it is allowed (inside a
+linked worktree or outside a repo) it can still write to the main checkout by
+absolute path: the guard does not isolate it. The worktree starts from HEAD, so
 a main checkout with uncommitted or untracked changes is refused (commit or
 stash first). `pre_verify` is a nudge, not enforcement: it asks for checks and
 a diff summary but cannot prove they ran. Without `modify` support the guard

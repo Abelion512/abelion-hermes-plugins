@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import re
 
-from ._patterns import PAREN_CRED_RE
+from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def redact_output(response_text: str) -> str | None:
     n = 0  # count of parenthetical pattern substitutions
 
     # Layer 1: prose parenthetical credentials
-    if "(" in text and ")" in text:
+    if PAREN_LABEL_RE.search(text):
         new_text, n = PAREN_CRED_RE.subn(
             lambda m: "*** " + m.group(2), text
         )

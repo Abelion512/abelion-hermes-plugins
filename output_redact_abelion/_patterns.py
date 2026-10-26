@@ -44,3 +44,13 @@ PAREN_CRED_RE = re.compile(
     r"\))",
     re.IGNORECASE | re.VERBOSE,
 )
+
+
+# Cheap pre-filter: PAREN_CRED_RE can only match when a "(label)" annotation exists.
+# Running this first avoids the leading \S+(?:\s+\S+){0,5}? backtracking on text without one.
+PAREN_LABEL_RE = re.compile(
+    r"\(\s*(?:app[ _-]?(?:email|pass)|pass[ _-]?email|client[ _-]?(?:id|secret)"
+    r"|api[ _-]?(?:key|secret)|auth|webhook[ _-]?secret|sudo[ _-]?password"
+    r"|password|pass|pw|secret|credential|token|apikey|email|user|apppass)",
+    re.IGNORECASE,
+)

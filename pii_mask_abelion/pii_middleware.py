@@ -17,10 +17,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-from copy import deepcopy
 from typing import Any, Optional
 
-from ._patterns import PAREN_CRED_RE
+from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,8 @@ def classify_content(text: str) -> str:
 
     # Check CONFIDENTIAL first (highest priority)
     for pattern, _ in SECRET_PATTERNS:
+        if pattern is PAREN_CRED_RE and not PAREN_LABEL_RE.search(text):
+            continue
         if pattern.search(text):
             return CONFIDENTIAL
 
@@ -108,6 +109,8 @@ def mask_content(text: str, mask_char: str = "[REDACTED]") -> str:
     result = text
 
     for pattern, label in SECRET_PATTERNS:
+        if pattern is PAREN_CRED_RE and not PAREN_LABEL_RE.search(result):
+            continue
         new_result, count = pattern.subn(
             lambda m: _mask_match(m, label, mask_char), result
         )
@@ -139,38 +142,35 @@ def pii_middleware(
     if not messages:
         return None
 
-    changed = False
-    new_request = deepcopy(request)
-    new_messages = new_request.get("messages", [])
-
     total_masked = 0
-    sensitivity = PUBLIC
-
-    for msg in new_messages:
+    new_messages = []
+    for msg in messages:
         content = msg.get("content", "")
+        new_msg = msg
         if isinstance(content, list):
             # Multi-part content (tool results, images, etc.)
-            for part in content:
-                if part.get("type") == "text":
-                    text = part.get("text", "")
-                    masked, count = mask_content(text)
+            new_parts = None
+            for i, part in enumerate(content):
+                if isinstance(part, dict) and part.get("type") == "text":
+                    masked, count = mask_content(part.get("text", ""))
                     if count > 0:
-                        part["text"] = masked
+                        if new_parts is None:
+                            new_parts = list(content)
+                        new_parts[i] = {**part, "text": masked}
                         total_masked += count
-                        changed = True
+            if new_parts is not None:
+                new_msg = {**msg, "content": new_parts}
         elif isinstance(content, str):
             masked, count = mask_content(content)
             if count > 0:
-                msg["content"] = masked
+                new_msg = {**msg, "content": masked}
                 total_masked += count
-                changed = True
+        new_messages.append(new_msg)
 
-        # Track highest sensitivity found
-        level = classify_content(str(content))
-        if level == CONFIDENTIAL:
-            sensitivity = CONFIDENTIAL
-        elif level == INTERNAL and sensitivity != CONFIDENTIAL:
-            sensitivity = INTERNAL
+    changed = total_masked > 0
+    # Copy-on-write: the caller's request is never mutated.
+    new_request = {**request, "messages": new_messages} if changed else None
+    sensitivity = CONFIDENTIAL if changed else PUBLIC
 
     if changed:
         logger.info(

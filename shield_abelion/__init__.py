@@ -20,7 +20,7 @@ def _hook(tool_name, args, **kwargs):
     if block: return block
     block = safety_check_block(tool_name, args)
     if block: return block
-    block = loop_check_block(tool_name, args)
+    block = loop_check_block(tool_name, args, session_id=session_id)
     if block: return block
     block = cb_check_block(tool_name, args)
     if block: return block

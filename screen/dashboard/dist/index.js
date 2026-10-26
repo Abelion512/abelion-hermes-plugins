@@ -29,6 +29,10 @@
   const { useState, useEffect, useRef, useCallback } = SDK.hooks;
 
   const API = "/api/plugins/screen";
+  // Upper bound for ONE connect cycle (observe + noVNC + ticket + RFB
+  // handshake). Without it a stalled WebSocket/handshake leaves "menyambung..."
+  // forever and keeps the Connect button disabled.
+  const CONNECT_TIMEOUT_MS = 15000;
   const RFB_URL = "/dashboard-plugins/screen/dist/vendor/novnc/core/rfb.js";
 
   let rfbModule = null;
@@ -56,6 +60,8 @@
     const pollRef = useRef(null);
     const retryRef = useRef(null);
     const connectingRef = useRef(false);
+    const connectSeqRef = useRef(0);
+    const connectTimerRef = useRef(null);
 
     const [conn, setConn] = useState("memutuskan");
     const [lease, setLease] = useState("unknown");
@@ -108,14 +114,42 @@
       if (connectingRef.current) return;
       connectingRef.current = true;
       if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
+      const seq = ++connectSeqRef.current;
+      let stage = "observe";
+      const stageText = { observe: "minta tiket display", novnc: "muat noVNC",
+                          ws: "buka WebSocket", rfb: "handshake layar (RFB)" };
+      if (connectTimerRef.current) clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = setTimeout(function () {
+        connectTimerRef.current = null;
+        if (seq !== connectSeqRef.current || !connectingRef.current || deadRef.current) return;
+        // Siklus ini macet: akhiri, jangan biarkan Connect terkunci.
+        connectSeqRef.current++;
+        connectingRef.current = false;
+        const stuck = rfbRef.current;
+        rfbRef.current = null;
+        if (stuck) { try { stuck.disconnect(); } catch (_e) {} }
+        setConn("gagal");
+        setNote("sambungan gambar tidak selesai pada tahap: " + stageText[stage]);
+        scheduleReconnect();
+      }, CONNECT_TIMEOUT_MS);
       setConn("menyambung...");
       setErr(null);
       setNote(null);
       try {
         await SDK.fetchJSON(`${API}/observe`, { method: "POST" });
+        if (seq !== connectSeqRef.current) return;
+        stage = "novnc";
         const RFB = await loadRFB();
+        if (seq !== connectSeqRef.current) return;
+        stage = "ws";
         const url = await SDK.buildWsUrl(`${API}/display/ws`, {});
-        if (deadRef.current || !screenRef.current) { connectingRef.current = false; return; }
+        if (seq !== connectSeqRef.current) return;
+        if (deadRef.current || !screenRef.current) {
+          connectingRef.current = false;
+          if (connectTimerRef.current) { clearTimeout(connectTimerRef.current); connectTimerRef.current = null; }
+          return;
+        }
+        stage = "rfb";
         // Gantikan viewer lama secara utuh: putuskan DAN buang DOM-nya.
         // noVNC tidak menghapus canvas-nya saat disconnect, jadi tanpa
         // pembersihan ini tiap siklus menambah satu canvas baru di stage.
@@ -130,6 +164,7 @@
           // Event dari viewer yang sudah digantikan tidak boleh menyentuh
           // state: cegah banner/usang dan counter yang menempel pada sesi baru.
           if (rfbRef.current !== rfb) return;
+          if (connectTimerRef.current) { clearTimeout(connectTimerRef.current); connectTimerRef.current = null; }
           connectingRef.current = false;
           everConnected.current = true;
           attempts.current = 0;
@@ -143,12 +178,15 @@
           // palsu - siklus putus-sambung dan canvas bertumpuk bermula di sini.
           if (rfbRef.current !== rfb) return;
           rfbRef.current = null;
+          if (connectTimerRef.current) { clearTimeout(connectTimerRef.current); connectTimerRef.current = null; }
           connectingRef.current = false;
           setConn("terputus");
           scheduleReconnect();
         });
         rfbRef.current = rfb;
       } catch (e) {
+        if (seq !== connectSeqRef.current) return;
+        if (connectTimerRef.current) { clearTimeout(connectTimerRef.current); connectTimerRef.current = null; }
         connectingRef.current = false;
         setConn("gagal");
         setErr(apiErrorMessage(e));
@@ -394,6 +432,8 @@
       pollRef.current = setInterval(refreshLease, 5000);
       return function () {
         deadRef.current = true;
+        connectSeqRef.current++;
+        if (connectTimerRef.current) { clearTimeout(connectTimerRef.current); connectTimerRef.current = null; }
         if (pollRef.current) clearInterval(pollRef.current);
         if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
         if (rfbRef.current) { try { rfbRef.current.disconnect(); } catch (_e) {} }

@@ -499,7 +499,7 @@
             note ? h("div", { className: "hermes-screen-hint" }, note) : null,
             err ? h("div", { className: "hermes-screen-error" }, err) : null)
         : null;
-    return h("div", { className: "hermes-screen-page", ref: pageRef },
+    return h("div", { className: "hermes-screen-page" + (isFs ? " hermes-screen-page--fs" : ""), ref: pageRef },
       h("div", { className: "hermes-screen-toolbar" },
         h("span", { className: "hermes-screen-title" }, "Screen"),
         h("span", {

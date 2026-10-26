@@ -42,3 +42,10 @@
   .hermes-screen-actions { flex-wrap: wrap; }
   .hermes-screen-actions > * { min-height: 36px; }
 }
+/* HP landscape + layar penuh: sembunyikan header dan tombol supaya desktop
+   dapat seluruh layar (rasio asli, tidak dipotong/digepengkan). Kontrol
+   muncul lagi dengan memutar HP ke portrait (layar penuh tetap aktif).
+   Di luar kondisi ini (desktop, portrait, tidak layar penuh) tidak berubah. */
+@media (orientation: landscape) and (pointer: coarse) {
+  .hermes-screen-page--fs .hermes-screen-toolbar { display: none; }
+}

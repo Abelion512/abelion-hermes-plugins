@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-BUILD = "screen-plugin v0.6.2-20261026"
+BUILD = "screen-plugin v0.6.3-20261026"
 MAX_WS_FRAME = 64 * 1024 * 1024
 ALLOWED_RPC = ("display.observe", "display.status",
                "display.lease.acquire", "display.lease.release")

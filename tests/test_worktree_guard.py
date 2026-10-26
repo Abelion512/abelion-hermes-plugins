@@ -182,6 +182,72 @@ class FailSafe(Base):
         self.assertEqual(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})["action"], "block")
 
 
+class DirtyMain(Base):
+    def _assert_refused_clean(self, r):
+        self.assertEqual(r["action"], "block")
+        self.assertIn("uncommitted or untracked", r["message"])
+        self.assertFalse(self.wt().exists())
+
+    def test_tracked_change_blocks_creation_and_changes_nothing(self):
+        (self.repo / "a.txt").write_text("user work")
+        self._assert_refused_clean(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": "z"}))
+        self._assert_refused_clean(self.hook("terminal", {"command": "git add -A"}))
+        self.assertEqual((self.repo / "a.txt").read_text(), "user work")
+
+    def test_staged_and_untracked_block_too(self):
+        (self.repo / "new.py").write_text("1")
+        self._assert_refused_clean(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": "z"}))
+        git(self.repo, "add", "new.py")
+        self._assert_refused_clean(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": "z"}))
+
+    def test_existing_session_worktree_is_not_rechecked(self):
+        self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        (self.repo / "later.txt").write_text("late")
+        self.assertEqual(self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})["action"], "modify")
+
+
+class ExecuteCode(Base):
+    def test_blocked_when_session_cwd_is_main(self):
+        r = self.hook("execute_code", {"code": "open('a.txt','w').write('x')"})
+        self.assertEqual(r["action"], "block")
+        self.assertIn("execute_code", r["message"])
+
+    def test_allowed_in_worktree_non_repo_and_with_explicit_opt_in(self):
+        os.environ["TERMINAL_CWD"] = str(self.manual)
+        self.assertIsNone(self.hook("execute_code", {"code": "1"}))
+        os.environ["TERMINAL_CWD"] = str(self.plain)
+        self.assertIsNone(self.hook("execute_code", {"code": "1"}))
+        os.environ["TERMINAL_CWD"] = str(self.repo)
+        os.environ["HERMES_WORKTREE_GUARD_EXECUTE_CODE"] = "allow"
+        self.addCleanup(os.environ.pop, "HERMES_WORKTREE_GUARD_EXECUTE_CODE", None)
+        self.assertIsNone(self.hook("execute_code", {"code": "1"}))
+
+
+class Capability(Base):
+    def test_block_only_mode_when_host_cannot_modify(self):
+        wg._MODIFY_OK = False
+        self.addCleanup(setattr, wg, "_MODIFY_OK", True)
+        r = self.hook("write_file", {"path": str(self.repo / "a.txt"), "content": ""})
+        self.assertEqual(r["action"], "block")
+        self.assertIn(str(self.wt()), r["message"])
+        self.assertEqual(self.hook("terminal", {"command": "git add -A"})["action"], "block")
+
+    def test_load_refused_without_pre_tool_call_hook(self):
+        import types
+        fake = types.ModuleType("hermes_cli.plugins")
+        fake.VALID_HOOKS = {"post_tool_call"}
+        saved = sys.modules.get("hermes_cli.plugins")
+        sys.modules["hermes_cli.plugins"] = fake
+        try:
+            with self.assertRaises(RuntimeError):
+                wg.register(type("C", (), {"register_hook": lambda *a: None})())
+        finally:
+            if saved is None:
+                sys.modules.pop("hermes_cli.plugins")
+            else:
+                sys.modules["hermes_cli.plugins"] = saved
+
+
 class Switches(Base):
     def test_off_and_allow(self):
         os.environ["HERMES_WORKTREE_GUARD"] = "off"

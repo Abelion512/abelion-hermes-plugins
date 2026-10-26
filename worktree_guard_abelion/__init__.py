@@ -14,13 +14,20 @@ Hooks (stdlib only, no core changes):
   plugin created, asks it to run the project's checks and summarise
   ``git diff --stat`` there before handing over. Never merges.
 
-Limits: a policy hook, not an OS sandbox. The terminal check is a pattern match;
-``execute_code`` and creative shell commands can still write anywhere. Paths
-outside any git repo are allowed by design.
+``execute_code`` (arbitrary Python, cannot be re-routed) is blocked while the
+session cwd is a main checkout. A dirty main checkout (tracked changes or
+untracked files) blocks worktree creation, so the agent never works on code
+that silently lacks the user's uncommitted work.
+
+Limits: a policy hook, not an OS sandbox. The terminal check is a pattern match,
+so creative shell commands can still write anywhere; tools not named above
+(for example browser/computer-use input) are not covered. Paths outside any git
+repo are allowed by design. The ``pre_verify`` hook is a nudge, not enforcement.
 
 Env (read from the Hermes process, logged at start-up when set):
 HERMES_WORKTREE_GUARD=off disables everything;
-HERMES_WORKTREE_GUARD_ALLOW=/a:/b exempts those repo roots.
+HERMES_WORKTREE_GUARD_ALLOW=/a:/b exempts those repo roots;
+HERMES_WORKTREE_GUARD_EXECUTE_CODE=allow stops blocking execute_code.
 """
 
 from __future__ import annotations
@@ -48,6 +55,8 @@ _REDIRECT_TARGET = re.compile(r"(?<![0-9&<])>>?\s*(?!&|/dev/null)(\S+)")
 _GIT_TIMEOUT = 3
 _ADD_TIMEOUT = 25  # Hermes cancels pre_tool_call hooks at 30s (fail closed)
 _PLUGIN_DIR = os.path.realpath(os.path.dirname(__file__))
+
+_MODIFY_OK = True  # set by register(): False => host cannot apply `modify`, so re-routes become blocks
 
 _lock = threading.RLock()
 _created: dict[tuple[str, str], str] = {}   # (session key, repo root) -> worktree path
@@ -133,6 +142,13 @@ def ensure_worktree(root: str, key: str) -> str:
             if not _is_linked_worktree_of(wt, root):
                 raise RuntimeError(f"{wt} exists but is not a worktree of {root}")
         else:
+            dirty = _git(root, "status", "--porcelain")
+            if dirty is None:
+                raise RuntimeError("could not read git status of the main checkout")
+            if dirty:
+                raise RuntimeError(
+                    f"the main checkout {root} has uncommitted or untracked changes that a worktree made from HEAD "
+                    f"would not contain; commit or stash them, then retry")
             branch = f"hermes/{_slug(key)}"
             try:
                 created = _git(root, "worktree", "add", "-b", branch, wt, timeout=_ADD_TIMEOUT) is not None
@@ -186,6 +202,12 @@ def _command_paths(cmd: str, cwd: str) -> list[tuple[str, bool]]:
     return out
 
 
+def _reroute(new_args: dict, wt: str, root: str) -> dict:
+    if _MODIFY_OK:
+        return {"action": "modify", "args": new_args}
+    return _unsafe(_blocked_in(root, wt) + " (this Hermes cannot rewrite tool arguments, so the call was blocked instead.)")
+
+
 def _unsafe(msg: str) -> dict[str, str]:
     return {"action": "block", "message": msg}
 
@@ -226,7 +248,18 @@ def decide(tool_name: str, args: dict[str, Any], task_id: str = "", tool_call_id
             _pending[tool_call_id or f"{key}:{tool_name}"] = (
                 f"[worktree-guard] Edit re-routed from {real} to {new_path}. Work in {wt} from now on; "
                 f"review `git diff` there before handing over. Never edit {root} directly.")
-            return {"action": "modify", "args": {"path": new_path}}
+            return _reroute({"path": new_path}, wt, root)
+        return None
+
+    if tool_name == "execute_code":
+        if os.environ.get("HERMES_WORKTREE_GUARD_EXECUTE_CODE", "").strip().lower() == "allow":
+            return None
+        root = main_checkout_root(base)
+        if root:
+            return _unsafe(
+                f"Blocked by worktree-guard: execute_code runs arbitrary Python and cannot be confined to a worktree, "
+                f"and this session's working directory is the main checkout {root}. Use write_file/patch/terminal "
+                f"(they are routed into a session worktree automatically), or start the session inside a worktree.")
         return None
 
     if tool_name == "read_file":  # once a session worktree exists, show its content, not the stale main copy
@@ -239,7 +272,7 @@ def decide(tool_name: str, args: dict[str, Any], task_id: str = "", tool_call_id
             if wt and not rel.startswith(".git"):
                 _pending[tool_call_id or f"{key}:{tool_name}"] = (
                     f"[worktree-guard] Read from the session worktree: {os.path.join(wt, rel)} (not {real}).")
-                return {"action": "modify", "args": {"path": os.path.join(wt, rel)}}
+                return _reroute({"path": os.path.join(wt, rel)}, wt, root)
         return None
 
     if tool_name == "terminal":
@@ -264,7 +297,7 @@ def decide(tool_name: str, args: dict[str, Any], task_id: str = "", tool_call_id
         _pending[tool_call_id or f"{key}:{tool_name}"] = (
             f"[worktree-guard] Command re-routed from {cwd} to {new_cwd}. Work in {wt} from now on; "
             f"review `git diff` there before handing over. Never modify {cwd_root} directly.")
-        return {"action": "modify", "args": {"workdir": new_cwd}}
+        return _reroute({"workdir": new_cwd}, wt, cwd_root)
     return None
 
 
@@ -298,12 +331,44 @@ def _pre_verify(coding=False, attempt=0, changed_paths=None, **kwargs):
     return None
 
 
+def _host_supports_modify() -> bool:
+    """True when the host's pre_tool_call dispatch returns and applies modified args."""
+    try:
+        import inspect
+
+        import hermes_cli.plugins as hp
+        import model_tools
+
+        return (hasattr(hp, "_dispatch_pre_tool_call_hooks")
+                and "modified_args" in inspect.getsource(model_tools._pre_dispatch_guards))
+    except Exception:
+        return False
+
+
 def register(ctx):
+    global _MODIFY_OK
+    try:
+        from hermes_cli.plugins import VALID_HOOKS
+        missing = {"pre_tool_call", "transform_tool_result", "pre_verify"} - set(VALID_HOOKS)
+    except Exception:
+        missing = set()  # not running inside Hermes (unit tests)
+    if "pre_tool_call" in missing:
+        raise RuntimeError("worktree-guard-abelion: this Hermes has no pre_tool_call hook; refusing to load a "
+                           "guard that cannot guard. Upgrade Hermes or remove the plugin.")
+    in_hermes = "hermes_cli.plugins" in __import__("sys").modules
+    _MODIFY_OK = _host_supports_modify() if in_hermes else True
+    if not _MODIFY_OK:
+        logger.error("[worktree_guard_abelion] host cannot rewrite tool arguments: running in block-only mode")
+    if missing:
+        logger.warning("[worktree_guard_abelion] host lacks hooks %s: notices/handoff nudge unavailable", sorted(missing))
     if _disabled():
         logger.warning("[worktree_guard_abelion] DISABLED by HERMES_WORKTREE_GUARD")
     elif _allowed_roots():
         logger.warning("[worktree_guard_abelion] repo roots exempt from the guard: %s", sorted(_allowed_roots()))
-    ctx.register_hook("pre_tool_call", _pre_tool_call)
-    ctx.register_hook("transform_tool_result", _transform_tool_result)
-    ctx.register_hook("pre_verify", _pre_verify)
-    logger.info("[worktree_guard_abelion] registered")
+    if os.environ.get("HERMES_WORKTREE_GUARD_EXECUTE_CODE", "").strip().lower() == "allow":
+        logger.warning("[worktree_guard_abelion] execute_code is NOT blocked (HERMES_WORKTREE_GUARD_EXECUTE_CODE=allow)")
+    for name, fn in (("pre_tool_call", _pre_tool_call), ("transform_tool_result", _transform_tool_result),
+                     ("pre_verify", _pre_verify)):
+        if name not in missing:
+            ctx.register_hook(name, fn)
+    logger.info("[worktree_guard_abelion] registered (modify=%s)", _MODIFY_OK)

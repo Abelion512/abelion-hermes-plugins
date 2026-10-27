@@ -52,7 +52,7 @@ DISCORD_TOKEN = re.compile(r"\b[MNO][A-Za-z0-9_\-]{23,25}\.[A-Za-z0-9_\-]{6}\.[A
 # Name is bounded to 64 chars; the value excludes whitespace and delimiters.
 _ASSIGN = re.compile(
     r"(?P<name>[A-Za-z][A-Za-z0-9_.\-]{1,63})"
-    r"(?P<sep>[\"']?\??[ \t]*[:=][ \t]*[\"']?)"
+    r"(?P<sep>[\"']?\??[ \t]*(?:[:=]|%3[DdAa])[ \t]*[\"']?)"
     r"(?P<value>[^\s\"',;&<>{}\[\]()/][^\s\"',;&<>{}\[\]()]{5,})"
 )
 # CLI flags: --password hunter2, --api-key=abc, -H "x-api-key: abc" is covered by _ASSIGN.
@@ -89,6 +89,9 @@ _NOT_VALUE_ANY = {"count", "limit", "usage", "ttl", "expires", "expiry", "path",
 
 _PATH_VALUE = re.compile(r"^(?:\.{0,2}/|~/|[A-Za-z]:\\)[\w./\\ -]+$")
 
+_TYPE_WORDS = frozenset({"string", "number", "integer", "boolean", "object", "array", "null", "none", "true",
+                         "false", "secret", "required", "optional", "str", "bool", "int"})
+_PEM = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
 _PLACEHOLDER_START = ("[REDACTED", "${", "$(", "{{", "%(", "<", "***", "xxx", "your_", "your-", "changeme")
 
 
@@ -133,7 +136,7 @@ def _plain_url(value: str) -> bool:
 
 def _looks_like_reference(value: str) -> bool:
     low = value.lower()
-    return low.startswith(_PLACEHOLDER_START) or bool(_PATH_VALUE.match(value)) or _plain_url(value)
+    return low in _TYPE_WORDS or low.startswith(_PLACEHOLDER_START) or bool(_PATH_VALUE.match(value)) or _plain_url(value)
 
 
 def _sub_assign(m: re.Match) -> str:
@@ -158,7 +161,10 @@ def mask_credentials(text: str) -> tuple[str, int]:
                            (DISCORD_TOKEN, "DISCORD_TOKEN")):
         text, n = pattern.subn(f"[REDACTED]_{label}", text)
         changes += n
-    if ":" in text or "=" in text:
+    if "-----BEGIN" in text:
+        text, n = _PEM.subn("[REDACTED]_PRIVATE_KEY", text)
+        changes += n
+    if ":" in text or "=" in text or "%3" in text:
         text, n = _ASSIGN.subn(_sub_assign, text)
         changes += _count_new(n, text)
     if "--" in text:
@@ -170,3 +176,22 @@ def mask_credentials(text: str) -> tuple[str, int]:
 def _count_new(subn_count: int, text: str) -> int:
     # subn counts every regex match (including unchanged ones); count real masks instead.
     return text.count("[REDACTED]_SECRET_FIELD") + text.count("[REDACTED]_ID_FIELD") if subn_count else 0
+
+
+_AUTH_KEYS = frozenset({"authorization", "proxy-authorization"})
+
+
+def mask_value_for_key(key: str, value: str) -> tuple[str, int]:
+    """Structured data: the field name is a separate dict key, so decide by key. (value, changes)."""
+    if len(value) < 6 or _looks_like_reference(value):
+        return value, 0
+    low = key.lower()
+    if low in _AUTH_KEYS:
+        scheme, _, rest = value.partition(" ")
+        if rest and not rest.startswith("[REDACTED"):
+            return f"{scheme} [REDACTED]_SECRET_FIELD", 1
+        return (value, 0) if rest else ("[REDACTED]_SECRET_FIELD", 1)
+    kind = classify_field(key)
+    if kind is None:
+        return value, 0
+    return ("[REDACTED]_SECRET_FIELD" if kind == "SECRET" else "[REDACTED]_ID_FIELD"), 1

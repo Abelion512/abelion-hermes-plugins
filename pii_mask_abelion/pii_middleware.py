@@ -19,7 +19,7 @@ import logging
 import re
 from typing import Any, Optional
 
-from ._credentials import mask_credentials
+from ._credentials import classify_field, mask_credentials, mask_value_for_key
 from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 
 logger = logging.getLogger(__name__)
@@ -127,12 +127,15 @@ def _mask_match(match: re.Match, label: str, mask_char: str) -> str:
 
 # ── Middleware ─────────────────────────────────────────────────────────
 
-# Strings under these keys are structure, not content: never rewritten.
+# String values under these keys are structure, not content: never rewritten.
 _SKIP_KEYS = frozenset({
     "role", "type", "id", "name", "model", "tool_call_id", "call_id", "tool_use_id", "mime_type",
-    "media_type", "finish_reason", "tool_choice", "stream", "stream_options", "tools", "functions",
-    "image_url", "image", "data", "b64_json", "file_data", "audio", "input_audio", "source",
+    "media_type", "finish_reason", "tool_choice",
 })
+# Binary payloads: opaque, left alone (a known gap: secrets inside images/audio are not inspected).
+_BINARY_KEYS = frozenset({"data", "b64_json", "file_data", "audio", "bytes"})
+_VALUE_KEYS = frozenset({"default", "example", "examples", "const", "value"})
+_B64 = re.compile(r"[A-Za-z0-9+/=_\-]{128,}")
 
 
 def _mask_json_string(text: str):
@@ -154,21 +157,31 @@ def _mask_obj(value: Any, key: str = ""):
     if isinstance(value, str):
         if not value or key in _SKIP_KEYS or value.startswith("data:"):
             return value, 0
+        if key in _BINARY_KEYS and _B64.fullmatch(value):
+            return value, 0
         if key == "arguments" and value[:1] in "{[":
             res = _mask_json_string(value)
             if res is not None:
                 return res
+        if key:
+            new, count = mask_value_for_key(key, value)
+            if count:
+                return new, count
         masked, count = mask_content(value)
         return (masked, count) if count else (value, 0)
     if isinstance(value, dict):
         out = None
         total = 0
+        pair = value.get("name") if isinstance(value.get("name"), str) else None
         for k, v in value.items():
-            if k in _SKIP_KEYS and not isinstance(v, (dict, list)):
+            if not isinstance(k, str):
                 continue
-            if k in ("tools", "functions", "image_url", "source", "input_audio"):
-                continue
-            new, count = _mask_obj(v, k if isinstance(k, str) else "")
+            # {"name": "HF_TOKEN", "value": "..."} style entries: classify by the name.
+            if pair is not None and k == "value" and isinstance(v, str) and classify_field(pair):
+                new, count = mask_value_for_key(pair, v)
+            else:
+                # {"api_key": {"default": "..."}}: the value inherits the credential field name.
+                new, count = _mask_obj(v, key if k in _VALUE_KEYS and key and classify_field(key) else k)
             if count:
                 if out is None:
                     out = dict(value)
@@ -197,8 +210,8 @@ def pii_middleware(
     """LLM request middleware: mask PII and credentials in the outgoing request.
 
     Walks the WHOLE request (messages, tool-call arguments, system/instructions/input and
-    other provider-specific fields), not just ``messages[].content``. Tool schemas, ids,
-    roles, model names and binary/image data are left alone. Copy-on-write: the caller's
+    other provider-specific fields), not just ``messages[].content``. Tool schemas are walked too (descriptions, defaults, examples) but only string values change. Ids,
+    roles, model names and opaque base64 payloads are left alone. Copy-on-write: the caller's
     request is never mutated.
 
     Register via ctx.register_middleware("llm_request", pii_middleware).

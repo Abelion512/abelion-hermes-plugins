@@ -104,14 +104,14 @@ def test_transport_covers_every_request_shape():
     out = pii.pii_middleware(req)["request"]
     assert req == snap  # caller never mutated
     text = json.dumps(out)
-    assert FAKE not in json.dumps({k: v for k, v in out.items() if k != "tools"})
+    assert FAKE not in text  # including the tool schema description
     # structure intact
     assert out["model"] == "gpt-x" and out["stream"] is True
     assert out["messages"][1]["tool_calls"][0]["id"] == "c1"
     args = json.loads(out["messages"][1]["tool_calls"][0]["function"]["arguments"])  # still valid JSON
     assert args["n"] == 1 and FAKE not in args["command"] and "API_KEY" in args["command"]
     assert out["messages"][2]["content"][1] == req["messages"][2]["content"][1]  # image untouched
-    assert out["tools"] is req["tools"]  # tool schemas are not rewritten
+    assert out["tools"][0]["function"]["name"] == "terminal"  # schema structure intact
     assert "role" in text
 
 
@@ -127,3 +127,71 @@ def test_performance_stays_linear_on_plain_text():
         assert pii.pii_middleware(req) is None
     per_call = (time.perf_counter() - t) / 3
     assert per_call < 1.0, per_call  # generous CI bound; local is far lower
+
+
+def test_tool_schema_defaults_examples_and_schema_style_keys():
+    tool = {"type": "function", "function": {"name": "login", "parameters": {
+        "type": "object", "required": ["api_key"],
+        "properties": {
+            "api_key": {"type": "string", "description": "the key", "default": FAKE, "examples": [FAKE]},
+            "password": "string", "token": {"type": "string"}, "source": {"type": "string"}}}}}
+    out = pii.pii_middleware({"model": "m", "tools": [tool]})["request"]["tools"][0]
+    props = out["function"]["parameters"]["properties"]
+    assert FAKE not in json.dumps(out)
+    assert props["password"] == "string" and props["token"] == {"type": "string"}  # no corruption
+    assert out["function"]["parameters"]["required"] == ["api_key"]
+    assert tool["function"]["parameters"]["properties"]["api_key"]["default"] == FAKE  # input untouched
+
+
+def test_headers_extra_keys_and_name_value_pairs():
+    req = {"model": "m", "messages": [], "extra_headers": {"x-api-key": FAKE, "Authorization": f"Basic {FAKE}",
+                                                          "Content-Type": "application/json"},
+           "extra_body": {"client_secret": FAKE, "client_id": "id-123456", "temperature": 0.2,
+                          "env": [{"name": "HF_TOKEN", "value": FAKE}, {"name": "LOG_LEVEL", "value": "debug-mode"}]}}
+    out = pii.pii_middleware(req)["request"]
+    assert FAKE not in json.dumps(out)
+    assert out["extra_headers"]["Authorization"].startswith("Basic ")
+    assert out["extra_headers"]["Content-Type"] == "application/json"
+    assert out["extra_body"]["temperature"] == 0.2
+    assert out["extra_body"]["env"][1] == {"name": "LOG_LEVEL", "value": "debug-mode"}
+    assert out["extra_body"]["env"][0]["name"] == "HF_TOKEN"
+
+
+def test_multiline_private_key_and_wallet_context():
+    begin, end = "-----BEGIN " + "PRIVATE KEY-----", "-----END " + "PRIVATE KEY-----"  # built at runtime: keeps scanners quiet
+    pem = begin + "\n" + "\n".join(["Zx9fakeBody" + str(i) * 20 for i in range(4)]) + "\n" + end
+    out = masked(f"key file:\n{pem}\nafter")
+    assert "Zx9fakeBody" not in out and out.startswith("key file:") and out.endswith("after")
+    assert "Zx9fakeBody" not in masked(begin + "\nZx9fakeBody1111111111")  # truncated block
+    assert FAKE not in masked(f"ORACLE_WALLET_PASSWORD={FAKE}")
+    assert FAKE not in masked(f"wallet_password: {FAKE}\nOCI_AUTH_TOKEN = {FAKE}")
+
+
+def test_url_encoded_and_json_valid_arguments():
+    assert FAKE not in masked(f"https://example.test/cb?x=1&api_key%3D{FAKE}")
+    args = json.dumps({"url": f"https://example.test/a?token={FAKE}", "body": 'say "hi"\nline2', "n": [1, 2]})
+    req = {"messages": [{"role": "assistant", "tool_calls": [{"id": "c", "type": "function",
+                                                              "function": {"name": "f", "arguments": args}}]}]}
+    out = pii.pii_middleware(req)["request"]
+    parsed = json.loads(out["messages"][0]["tool_calls"][0]["function"]["arguments"])
+    assert FAKE not in json.dumps(parsed) and parsed["body"] == 'say "hi"\nline2' and parsed["n"] == [1, 2]
+    assert parsed["url"].startswith("https://example.test/a?token=")
+
+
+def test_binary_payload_untouched():
+    blob = "A" * 300
+    req = {"messages": [{"role": "user", "content": [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": blob}},
+        {"type": "text", "text": f"password: {FAKE}"}]}]}
+    out = pii.pii_middleware(req)["request"]
+    assert out["messages"][0]["content"][0]["source"]["data"] == blob
+    assert FAKE not in json.dumps(out)
+
+
+def test_pathological_inputs_do_not_blow_up():
+    cases = ["a" * 200000, "api_key=" + "x" * 200000, "-----BEGIN " + "PRIVATE KEY-----" + "y" * 200000,
+             "k=" * 100000, ":" * 200000, ("token " * 50000), "%3D" * 100000, "_-." * 60000 + "=v" * 5]
+    for text in cases:
+        t = time.perf_counter()
+        masked(text)
+        assert time.perf_counter() - t < 2.0, text[:20]

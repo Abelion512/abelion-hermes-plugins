@@ -72,12 +72,17 @@ def reset_detector() -> None:
 
 def snapshot() -> dict:
     """Dump loop detector state to JSON. Returns snapshot dict."""
+    with _lock:
+        tracked = list(_detectors.values())
+    tracked.append(_detector)  # fallback detector (hook calls without a session id)
+    newest = next((d for d in reversed(tracked) if d.action_history), _detector)
     data = {
         "timestamp": time.time(),
         "max_similar_actions": _detector.max_similar_actions,
         "window_size": _detector.window_size,
-        "history_size": len(_detector.action_history),
-        "recent": list(_detector.action_history)[-5:],
+        "sessions": len(tracked) - 1,
+        "history_size": sum(len(d.action_history) for d in tracked),
+        "recent": list(newest.action_history)[-5:],
     }
     base = os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes"))
     dest = os.path.join(base, "shield", "protect", "loop_detector.json")

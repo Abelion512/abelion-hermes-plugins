@@ -54,3 +54,12 @@ def test_session_state_is_bounded():
 def test_safety_guard_still_blocks_dangerous():
     assert sg.check_and_block("terminal", {"command": "rm -rf /"})
     assert sg.check_and_block("terminal", {"command": "ls -la"}) is None
+
+
+def test_snapshot_reports_per_session_detectors(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    ld.reset_detector()
+    ld.check_and_block("read_file", {"p": 1}, session_id="A")
+    ld.check_and_block("read_file", {"p": 2}, session_id="B")
+    snap = ld.snapshot()
+    assert snap["sessions"] == 2 and snap["history_size"] == 2 and snap["recent"]

@@ -152,8 +152,28 @@ def _mask_json_string(text: str):
     return json.dumps(new, ensure_ascii=False), count
 
 
-def _mask_obj(value: Any, key: str = ""):
+_MAX_DEPTH = 64
+_UNSUPPORTED = "[REDACTED]_UNSUPPORTED_STRUCTURE"
+
+
+def _mask_deep(value: Any, key: str):
+    """Subtree nested deeper than _MAX_DEPTH (or cyclic): mask through a JSON round trip.
+
+    Keeps dict/list shape and the valid-JSON contract providers need. A subtree that cannot be
+    serialised at all (cyclic) could not be sent as JSON either, so it is replaced, never forwarded raw.
+    """
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+        masked, _ = mask_content(text)
+        return json.loads(masked), 1
+    except (ValueError, TypeError, RecursionError, OverflowError):
+        return _UNSUPPORTED, 1
+
+
+def _mask_obj(value: Any, key: str = "", depth: int = 0):
     """Copy-on-write walk: returns (value, masked_count); unchanged objects are returned as is."""
+    if depth > _MAX_DEPTH and isinstance(value, (dict, list, tuple)):
+        return _mask_deep(value, key)
     if isinstance(value, str):
         if not value or key in _SKIP_KEYS or value.startswith("data:"):
             return value, 0
@@ -185,7 +205,7 @@ def _mask_obj(value: Any, key: str = ""):
                 new, count = mask_value_for_key(pair, v)
             else:
                 # {"api_key": {"default": "..."}}: the value inherits the credential field name.
-                new, count = _mask_obj(v, key if k in _VALUE_KEYS and key and classify_field(key) else k)
+                new, count = _mask_obj(v, key if k in _VALUE_KEYS and key and classify_field(key) else k, depth + 1)
             if count:
                 if out is None:
                     out = dict(value)
@@ -196,7 +216,7 @@ def _mask_obj(value: Any, key: str = ""):
         out = None
         total = 0
         for i, v in enumerate(value):
-            new, count = _mask_obj(v, key)
+            new, count = _mask_obj(v, key, depth + 1)
             if count:
                 if out is None:
                     out = list(value)
@@ -228,9 +248,13 @@ def pii_middleware(
     try:
         new_request, total_masked = _mask_obj(request)
     except Exception:
-        # Unsupported structure (cyclic, absurdly deep, ...). The host cannot be told to block the
-        # call from here: it would send the original, so say so loudly instead of failing silently.
-        logger.error("[PII] could not walk the request; it will be sent UNMASKED", exc_info=True)
+        # Last resort (a container whose iteration raises, ...): mask through a JSON round trip,
+        # which keeps shape but turns non-JSON objects into strings. The host would otherwise send
+        # the original, so a changed type is the lesser risk.
+        logger.error("[PII] request walk failed; masking via JSON round trip", exc_info=True)
+        fallback, _ = _mask_deep(request, "")
+        if isinstance(fallback, dict):
+            return {"request": fallback}
         return None
     if total_masked == 0:
         return None

@@ -247,15 +247,47 @@ def test_failure_modes_are_loud_and_never_pass_raw_values(monkeypatch, caplog):
     out = pii.pii_middleware({"messages": [{"role": "user", "content": f"password: {FAKE}"}]})["request"]
     assert FAKE not in json.dumps(out) and "MASK_ERROR" in json.dumps(out)
     monkeypatch.undo()
-    # unsupported structure: no exception escapes, and the gap is logged at error level
-    cyc = {"messages": []}
+    # cyclic subtree: replaced with a marker, the rest of the request is still masked
+    cyc = {"a": 1}
     cyc["self"] = cyc
-    with caplog.at_level("ERROR"):
-        assert pii.pii_middleware(cyc) is None
-    assert any("UNMASKED" in r.getMessage() for r in caplog.records)
+    out = pii.pii_middleware({"messages": [{"role": "user", "content": f"api_key: {FAKE}"}], "extra": cyc})["request"]
+    assert FAKE not in json.dumps(out) and "UNSUPPORTED_STRUCTURE" in json.dumps(out)
     assert pii.pii_middleware("not a dict") is None and pii.pii_middleware({}) is None
 
 
 def test_tuples_are_walked():
     out = pii.pii_middleware({"messages": ({"role": "user", "content": f"api_key: {FAKE}"},)})["request"]
     assert isinstance(out["messages"], tuple) and FAKE not in json.dumps(out)
+
+
+def _nest(levels):
+    deep = {"leaf": f"password: {FAKE}", "n": 1}
+    for _ in range(levels):
+        deep = {"x": deep}
+    return deep
+
+
+def test_deep_nesting_is_masked_not_skipped():
+    out = pii.pii_middleware({"messages": [], "extra_body": _nest(300)})["request"]  # beyond the walk depth
+    node = out["extra_body"]
+    while "leaf" not in node:
+        node = node["x"]
+    assert node["n"] == 1 and "[REDACTED]" in node["leaf"] and FAKE not in node["leaf"]
+
+
+def test_unserialisable_depth_is_replaced_not_forwarded():
+    out = pii.pii_middleware({"messages": [], "extra_body": _nest(5000)})["request"]
+    node = out["extra_body"]
+    for _ in range(100):
+        if not isinstance(node, dict):
+            break
+        node = node["x"]
+    assert node == "[REDACTED]_UNSUPPORTED_STRUCTURE"
+
+
+def test_walk_failure_falls_back_to_round_trip(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("walk")
+    monkeypatch.setattr(pii, "_mask_obj", boom)
+    out = pii.pii_middleware({"messages": [{"role": "user", "content": f"api_key: {FAKE}"}]})["request"]
+    assert FAKE not in json.dumps(out) and out["messages"][0]["role"] == "user"

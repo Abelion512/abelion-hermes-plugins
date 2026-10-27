@@ -136,10 +136,10 @@ def check_and_block_read_before_edit(
         return None
 
     # Creating a brand-new file has nothing to read first. Only an absolute path that does
-    # not exist yet is exempt: a relative path can't be resolved reliably here (tool cwd
+    # not exist yet (and is not a symlink) is exempt: a relative path can't be resolved reliably here (tool cwd
     # may differ), so it keeps the guard.
     expanded = os.path.expanduser(target)
-    if os.path.isabs(expanded) and not os.path.exists(expanded):
+    if os.path.isabs(expanded) and not os.path.lexists(expanded):  # lexists: any symlink (even dangling) keeps the guard
         return None
 
     with _read_lock:

@@ -63,3 +63,17 @@ def test_snapshot_reports_per_session_detectors(tmp_path, monkeypatch):
     ld.check_and_block("read_file", {"p": 2}, session_id="B")
     snap = ld.snapshot()
     assert snap["sessions"] == 2 and snap["history_size"] == 2 and snap["recent"]
+
+
+def test_symlinks_keep_the_guard(tmp_path):
+    real = tmp_path / "real.txt"
+    real.write_text("x")
+    live = tmp_path / "live"
+    live.symlink_to(real)
+    dangling = tmp_path / "dangling"
+    dangling.symlink_to(tmp_path / "missing.txt")
+    for link in (live, dangling):
+        blocked = sg.check_and_block_read_before_edit("write_file", {"path": str(link)}, session_id="sl")
+        assert blocked and blocked["action"] == "block", link
+    new = tmp_path / "brand_new.txt"
+    assert sg.check_and_block_read_before_edit("write_file", {"path": str(new)}, session_id="sl") is None

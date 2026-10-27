@@ -167,7 +167,11 @@ def _mask_obj(value: Any, key: str = ""):
             new, count = mask_value_for_key(key, value)
             if count:
                 return new, count
-        masked, count = mask_content(value)
+        try:
+            masked, count = mask_content(value)
+        except Exception:  # never let one string abort masking, and never pass it on unmasked
+            logger.warning("[PII] masking failed for a string; replaced it", exc_info=True)
+            return "[REDACTED]_MASK_ERROR", 1
         return (masked, count) if count else (value, 0)
     if isinstance(value, dict):
         out = None
@@ -188,7 +192,7 @@ def _mask_obj(value: Any, key: str = ""):
                 out[k] = new
                 total += count
         return (out, total) if out is not None else (value, 0)
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         out = None
         total = 0
         for i, v in enumerate(value):
@@ -198,7 +202,9 @@ def _mask_obj(value: Any, key: str = ""):
                     out = list(value)
                 out[i] = new
                 total += count
-        return (out, total) if out is not None else (value, 0)
+        if out is None:
+            return value, 0
+        return (tuple(out) if isinstance(value, tuple) else out), total
     return value, 0
 
 
@@ -219,7 +225,13 @@ def pii_middleware(
     """
     if not isinstance(request, dict) or not request:
         return None
-    new_request, total_masked = _mask_obj(request)
+    try:
+        new_request, total_masked = _mask_obj(request)
+    except Exception:
+        # Unsupported structure (cyclic, absurdly deep, ...). The host cannot be told to block the
+        # call from here: it would send the original, so say so loudly instead of failing silently.
+        logger.error("[PII] could not walk the request; it will be sent UNMASKED", exc_info=True)
+        return None
     if total_masked == 0:
         return None
     logger.info("[PII] Masked %d items in request (level=%s)", total_masked, CONFIDENTIAL)

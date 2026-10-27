@@ -237,3 +237,25 @@ def test_source_code_is_not_corrupted():
 def test_nested_label_before_credential_is_not_swallowed():
     for text in (f"out: password: {FAKE}", f"result: token = {FAKE}", f"line1 a: b: api_key={FAKE}"):
         assert FAKE not in masked(text), text
+
+
+def test_failure_modes_are_loud_and_never_pass_raw_values(monkeypatch, caplog):
+    # a string that makes the masker fail is replaced, not forwarded
+    def boom(text):
+        raise RuntimeError("x")
+    monkeypatch.setattr(pii, "mask_content", boom)
+    out = pii.pii_middleware({"messages": [{"role": "user", "content": f"password: {FAKE}"}]})["request"]
+    assert FAKE not in json.dumps(out) and "MASK_ERROR" in json.dumps(out)
+    monkeypatch.undo()
+    # unsupported structure: no exception escapes, and the gap is logged at error level
+    cyc = {"messages": []}
+    cyc["self"] = cyc
+    with caplog.at_level("ERROR"):
+        assert pii.pii_middleware(cyc) is None
+    assert any("UNMASKED" in r.getMessage() for r in caplog.records)
+    assert pii.pii_middleware("not a dict") is None and pii.pii_middleware({}) is None
+
+
+def test_tuples_are_walked():
+    out = pii.pii_middleware({"messages": ({"role": "user", "content": f"api_key: {FAKE}"},)})["request"]
+    assert isinstance(out["messages"], tuple) and FAKE not in json.dumps(out)

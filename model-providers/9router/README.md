@@ -1,4 +1,4 @@
-# 9router
+# 9Router Catalog
 
 Registers the local [9Router](http://localhost:20128) gateway as a Hermes
 model provider. Its models appear in the `/model` picker under the 9Router

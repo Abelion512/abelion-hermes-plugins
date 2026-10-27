@@ -1,4 +1,4 @@
-# screen
+# Bot Screen
 
 Adds a SCREEN tab to the Hermes web dashboard: a live view of the agent's
 Bot Screen (its own virtual desktop + browser - never your personal display),

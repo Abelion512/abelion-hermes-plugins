@@ -353,6 +353,14 @@ class Guard:
                 s=self.session(session_id)
                 approved_tokens=set(TOKEN.findall(response_text))
                 text=self.text(response_text,s)
+                # Native redaction runs BEFORE allowed CLI restoration. The map
+                # remains the sole restoration authority; secrets never restore.
+                from .output_redact import redact_output
+                redacted=redact_output(text)
+                if redacted is not None:
+                    if redacted.startswith("[OUTPUT_WITHHELD:"):
+                        return MARKER
+                    text=redacted
                 # Only local CLI may restore PII/paths. Credential values stay hidden.
                 # API/gateway recipients are not authenticated owner destinations here.
                 if platform=='cli':

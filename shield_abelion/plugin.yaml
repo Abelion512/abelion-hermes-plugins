@@ -1,9 +1,0 @@
-name: shield-abelion
-description: "pre_tool_call: read-before-edit, safety, loop, circuit breaker. Abelion security shield."
-version: 1.0.0
-author: Abelion
-kind: standalone
-metadata:
-  hermes:
-    category: security
-    tags: [security, shield, pre-tool, circuit-breaker, read-before-edit]

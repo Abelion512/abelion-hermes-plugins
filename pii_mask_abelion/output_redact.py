@@ -1,4 +1,4 @@
-"""Output redaction plugin — transform_llm_output hook.
+"""Privacy Guard final-output stage — transform_llm_output hook.
 
 Menambal celah pipeline: ``final_response`` dari LLM tidak melalui
 ``redact_sensitive_text()`` (redaksi hanya di ``messages[]`` untuk
@@ -33,21 +33,6 @@ def redact_output(response_text: str, **kwargs) -> str | None:
         return "[OUTPUT_WITHHELD:invalid_text]"
     if not response_text:
         return None
-    # A loaded privacy guard owns the held final and its session-local map.
-    # Plugin module namespaces are profile-specific; inspect the current manager,
-    # never import a second guard instance with an unrelated mapping.
-    try:
-        from hermes_cli.plugins import get_plugin_manager
-        manager = get_plugin_manager()
-        for callback in manager._hooks.get("transform_llm_output", []):
-            owner = getattr(callback, "__self__", None)
-            if owner is not None and type(owner).__name__ == "Guard" and callback.__name__ == "output":
-                return None
-    except ImportError:
-        pass
-    if not response_text:
-        return None
-
     text = response_text
     changed = False
     n = 0  # count of parenthetical pattern substitutions

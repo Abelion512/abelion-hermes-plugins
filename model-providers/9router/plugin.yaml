@@ -1,5 +1,5 @@
 name: 9router
-description: "9Router model provider (localhost:20128). Registers validated live chat model IDs and combos; offline fallback is unverified."
+description: "9Router Catalog (localhost:20128). Registers validated live chat model IDs and combos; offline fallback is unverified."
 version: 1.0.0
 author: Abelion
 kind: backend

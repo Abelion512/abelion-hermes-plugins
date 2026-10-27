@@ -10,7 +10,7 @@ metadata:
 
 # Redacted Output Handling Skill
 
-The output-redact-abelion plugin redacts credential-shaped material from the
+Privacy Guard (pii-mask-abelion) redacts credential-shaped material from the
 AI final response through transform_llm_output with hold_stream requested.
 When the mapping guard is loaded, this plugin yields to that guard. The
 mandatory core output policy is owned by pii-mask-abelion, not this plugin. This skill is how to treat redacted replies and denials.

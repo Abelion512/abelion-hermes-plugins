@@ -1,52 +1,18 @@
 # Delivery and compatibility
 
-This branch is a reviewed candidate, not a merged release. Do not use the old
-`update-plugins.sh` to obtain an unmerged branch: it pulls its current checkout.
+Local three-package candidate. No commit, push, merge, install, activation, Pages deployment or daily-profile change has been made. The closed privacy core remains unmerged and unadopted.
 
-## Install the chosen plugin
+Privacy Guard needs held-output registration. Mandatory protection needs the matching required-privacy core, verified locally at 9a85916c87d56c2ca00b02fad8918f93ef1816e9. Version labels alone do not prove compatibility. Current-upstream native features were compared in documentation/source, not verified on the laptop.
 
-Use the existing Hermes launcher so its own environment and profile are selected.
-Do not run a detached system Python or copy another environment into it.
+The previous six-plugin candidate had 145 passed plus one expected boundary xfail; minimal standalone had 65 passed and six integration skips; its actual-core boundary run had 59 passed in one complete canonical run. Those counts are historical and must not be presented as a fresh three-package result.
 
-```sh
-hermes plugins install --ref perf-pii-redact-abelion --enable Abelion512/abelion-hermes-plugins/shield_abelion
-```
+Fresh three-package evidence:
+- Configured privacy suite: 72 passed, 1 expected boundary xfail (not a pass).
+- Combined active suite without host test helpers resolving: 125 passed, 3 explicit integration skips. Do not add this count to the privacy count: they overlap. Minimal standalone: 70 passed, 6 explicit integration skips.
+- Actual closed core 9a85916: one complete direct canonical per-file-runner execution, 59 passed, 0 failed in 104.8s, clean environment. The shell wrapper had previously exceeded the outer time limit, so only the completed direct run supports this claim.
+- Disposable seven-to-three native removal/restart and pinned snapshot rollback passed, retaining mandatory privacy owner and one output hook.
+- Uploaded 278-case matrix: 170 pass, 10 fail, 98 retired Shield targets not run. Original expectations preserved. See validation/README.md. Not all green.
 
-Replace `shield_abelion` with the requested folder from the root table. This
-private repository needs existing GitHub access on the machine. Installation
-and enable change the selected profile; review its prompts and dependencies.
-A seven-plugin install is not required to use one plugin. Do not overwrite a
-working installation with rsync or enable required privacy without its core.
+ Remaining limitations: synthetic local requests, no actual provider proof, no complete Screen interaction suite and no daily-profile migration. Offline 9Router curated models are not verified inventory. Scanner success is not proof every secret format is detectable.
 
-## Required privacy is a separate host capability
-
-The pii-mask candidate requires held-output hooks. Mandatory request/tool/output
-checks additionally need the matching core PR in Abelion512/hermes-4gent, based
-on `9b904dcc22c23fe8b82834339bbdd96495072e59`. A stock host or a version number
-alone is not evidence that this contract exists. Missing held-output capability
-refuses plugin registration. Required mode without a working policy denies.
-Use the core developer guide and pii-mask README for disposable-profile setup;
-there is no verified daily-install migration yet. Keep daily config unchanged
-until host/source compatibility is established.
-
-## Evidence and limits
-
-The repository behavior tests exercise wrong type/value branches and their
-absence of effects. Run with the selected Hermes environment importable:
-
-```sh
-python -m pytest -q tests/test_ordered_validation.py
-# Privacy integration also imports the matching Hermes test helpers:
-PYTHONPATH=/path/to/reviewed/hermes:$PWD python -m pytest --import-mode=importlib -q pii_mask_abelion/tests
-```
-
-The tested fork passed 48 behavior cases, 63 privacy cases with 1 expected
-boundary xfail, native discovery/read/index for seven skills and controlled
-synthetic CLI probes. These results are development evidence, not an actual
-provider, full Screen feature suite, all Hermes releases or installed laptop
-proof. The unknown installed laptop source/runtime remains unresolved; no
-additional diagnostic-relay loop or portable user test is requested here.
-
-Rollback through the native plugin disable/remove flow. For required privacy,
-stop the process and follow the core rollback order before removing its policy.
-No merge, gateway restart, deployment or daily-profile change is done by this PR.
+Run retained tests with the matched host importable, or the minimal standalone environment. Retired tests remain in the rollback archive and are excluded from the active test suite; fewer tests do not mean regressions were fixed. See MIGRATION.md for stopped disposable-profile migration and pinned rollback order.

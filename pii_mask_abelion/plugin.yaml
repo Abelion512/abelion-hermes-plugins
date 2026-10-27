@@ -1,6 +1,6 @@
 name: pii-mask-abelion
-description: "Local redact: required privacy policy, request masking, destination-limited tools and held output."
-version: 1.1.0-test
+description: "Privacy Guard: required privacy policy, request/tool masking and held native output redaction."
+version: 1.2.0-test
 author: Abelion
 kind: standalone
 metadata:

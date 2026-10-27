@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 pii = importlib.import_module("pii_mask_abelion.pii_middleware")
-out = importlib.import_module("output_redact_abelion.output_redact")
+out = importlib.import_module("pii_mask_abelion.output_redact")
 
 
 def test_secrets_still_masked():

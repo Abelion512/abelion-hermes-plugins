@@ -4,7 +4,7 @@ This candidate combines Hermes's native secret redactor with session-local maski
 
 ## Required host
 
-The mandatory mode needs the matching local `privacy-required-guard-abelion` core patch (not a published branch) in `Abelion512/hermes-4gent`, based on `9b904dcc22c23fe8b82834339bbdd96495072e59`. Stock Hermes middleware is optional and does not make the auxiliary request boundary mandatory. A version number alone does not prove this core change exists. Tests used Linux and Python 3.14.9 with Hermes's OpenAI SDK; macOS/Windows and your install are not yet verified.
+The mandatory mode needs the matching `privacy-required-guard-abelion` core change (closed upstream PR #145619; not adopted) in `Abelion512/hermes-4gent`, based on `9b904dcc22c23fe8b82834339bbdd96495072e59`. Stock Hermes middleware is optional and does not make the auxiliary request boundary mandatory. A version number alone does not prove this core change exists. Tests used Linux and Python 3.14.9 with Hermes's OpenAI SDK; macOS/Windows and your install are not yet verified.
 
 ## Try without changing your normal profile
 
@@ -63,3 +63,31 @@ plus the identified Jev compaction-evaluation Decisions request. This is local
 review-pending code, not a published/installed release. Other direct HTTP and
 service calls are not a process-wide privacy boundary. Unknown/unsupported
 transports still deny at the guarded dispatch seam. No laptop/provider proof.
+
+## Consolidated Privacy Guard candidate
+
+This revision combines the two earlier privacy plugins into one installable plugin.
+The stable folder `pii_mask_abelion` and ID `pii-mask-abelion` are intentional: the
+required core owner setting and imports used by its integration harness stay valid.
+There is one held-output hook. It masks using the session map, applies native output
+redaction, then restores only permitted local-CLI PII/path tokens. Credentials never
+restore. Native redactor errors or unavailability withhold the output.
+
+### Existing installations
+
+No automatic migration is performed. Do not overwrite a running daily profile.
+For a reviewed migration in a disposable profile, stop its Hermes process first;
+keep the existing `pii-mask-abelion` install/owner ID, update that folder to the
+reviewed consolidated commit, and disable/remove the separate `output-redact-abelion`
+through Hermes' native plugin management. Restart and begin a new session, then
+verify that only `pii-mask-abelion` owns the required policy and only one privacy
+output hook is registered. Removing a callback while required mode is running
+intentionally denies. Do not disable required mode to bypass an error.
+
+A fresh install uses only `pii_mask_abelion`; the removed folder is not a second
+install target. Existing old plugin copies do not disappear merely because a repo
+folder was removed. Uninstalling them is a separate profile operation. Session maps
+are memory-only and are lost across restart; never reuse old placeholders in a new
+session. To roll back a disposable test, stop it and restore the previous pinned
+plugin/config versions together, then restart with a fresh session. The laptop and
+daily profile have not been migrated or activated.

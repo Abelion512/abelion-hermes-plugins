@@ -1,16 +1,25 @@
 import copy,json,re
+import importlib.util
 from pii_mask_abelion.guard import Guard,TOKEN,MARKER
+
+def _expected_output(available, unavailable):
+    try:
+        import agent.redact
+    except ImportError:
+        return unavailable
+    return available
+
 
 def test_case_and_session_exact():
     g=Guard();raw='Username=Abelion'
     out=g.request({'messages':[{'role':'user','content':raw}]},session_id='a')['request']
     token=TOKEN.search(str(out))[0]
-    assert g.output(token,session_id='a',platform='cli')=='Abelion'
+    assert g.output(token,session_id='a',platform='cli')==_expected_output('Abelion',MARKER)
     assert g.output(token.lower(),session_id='a',platform='cli')==MARKER
     assert g.output(token.upper(),session_id='a',platform='cli')==MARKER
     assert g.output(token,session_id='b',platform='cli')==MARKER
-    assert g.output(token,session_id='a',platform='api')==token
-    assert g.output(token,session_id='a',platform='whatsapp')==token
+    assert g.output(token,session_id='a',platform='api')==_expected_output(token,MARKER)
+    assert g.output(token,session_id='a',platform='whatsapp')==_expected_output(token,MARKER)
     typo=token[:-2]+('0' if token[-2]!='0' else '1')+'>'
     assert g.output(typo,session_id='a',platform='cli')==MARKER
 
@@ -61,7 +70,7 @@ def test_review_partial_tail_and_short_values():
 def test_review_kind_drift_and_bearer_userinfo():
     g=Guard();out=g.request({'m':'call 0812345678901'},session_id='a')['request']['m'];token=TOKEN.search(out)[0]
     g.request({'m':'password=0812345678901'},session_id='a')
-    assert g.output(token,session_id='a',platform='cli')==token
+    assert g.output(token,session_id='a',platform='cli')==_expected_output(token,MARKER)
     for text,raw in [('Authorization: Bearer abc.def.ghi-1234567890','abc.def.ghi-1234567890'),('mysql://root:pw123@host/db','pw123'),('ssh://user:pw@host','user:pw')]:
         assert raw not in g.request({'m':text},session_id='a')['request']['m']
 

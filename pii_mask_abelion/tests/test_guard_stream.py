@@ -16,7 +16,7 @@ def _sse(body):
     return [json.loads(l[6:]) for l in body.splitlines() if l.startswith("data: ") and l!="data: [DONE]"]
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("label,pl,src", [("guard",["pii_mask_abelion"],str(Path(__file__).resolve().parents[2])),("both",["pii_mask_abelion","output_redact_abelion"],str(Path(__file__).resolve().parents[2]))])
+@pytest.mark.parametrize("label,pl,src", [("guard",["pii_mask_abelion"],str(Path(__file__).resolve().parents[2])),("unified",["pii_mask_abelion"],str(Path(__file__).resolve().parents[2]))])
 async def test_probe(label,pl,src,tmp_path,monkeypatch):
     from hermes_cli import plugins
     home = tmp_path / "home" / ".hermes"

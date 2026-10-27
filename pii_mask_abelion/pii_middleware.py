@@ -5,7 +5,7 @@ Masks sensitive content BEFORE it reaches the provider.
 
 Levels (from research briefs):
   PUBLIC      → no mask, route any provider
-  INTERNAL    → mask internal keywords (company, proprietary)
+  INTERNAL    → classify internal keywords only; no prose-wide masking policy
   CONFIDENTIAL → mask secrets, PII, API keys
 
 Detection: regex + keyword heuristics (zero LLM cost).
@@ -53,6 +53,9 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)https?://[^@\s]+:[^@\s]+@'), "URL_WITH_CREDS"),
     # Private keys
     (re.compile(r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----'), "PRIVATE_KEY"),
+    # Complete PII values, before the legacy field matcher can consume a prefix.
+    (re.compile(r'(?<![\w.+-])[\w.+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}'), "EMAIL"),
+    (re.compile(r'(?<![\w\d])(?:\+62|62|08)[\d -]{7,16}\d(?!\d)'), "PHONE"),
     # PII patterns (Indonesia-specific KTP/NIK/NPWP)
     (re.compile(r'\b\d{16,19}\b'), "LONG_NUMBER"),
     (re.compile(r'(?i)\b(email|phone|address|ssn|kks|nik|ktp|npwp)\s*[:=]\s*["\']?\w+'), "PII_FIELD"),

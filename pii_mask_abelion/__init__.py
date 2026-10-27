@@ -16,7 +16,7 @@ def register(ctx):
 
     if hasattr(ctx,'register_system_prompt_section'):
         ctx.register_system_prompt_section('abelion.redact',
-            'Local redact plugin pii-mask-abelion is loaded. Sensitive values may be session-bound '
+            'Privacy Guard (pii-mask-abelion) is loaded. Sensitive values may be session-bound '
             'placeholders. Copy tokens exactly, never change their case or guess originals. '
             'For local file work use read_file, write_file, patch or search_files path slots. '
             'Do not paste placeholders into terminal commands, URLs, messages or delegate goals. '
@@ -29,3 +29,5 @@ def register(ctx):
         from pathlib import Path
         register_skill('privacy-mask-placeholders', Path(__file__).parent / 'skills' / 'privacy-mask-placeholders' / 'SKILL.md',
                        'Work with masked PII, credential and path placeholders.')
+        register_skill('redacted-output-handling', Path(__file__).parent / 'skills' / 'redacted-output-handling' / 'SKILL.md',
+                       'Handle responses passed through credential redaction.')

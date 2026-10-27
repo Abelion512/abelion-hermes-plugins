@@ -9,7 +9,7 @@ SOURCE=Path(__file__).resolve().parents[2]
 CANARIES=['sk-proj-Qm7Zk2Wp9Rt4Lx8aB3cD5eF6gH7','Zk7Qm2Wp9Rt4Lx8vN5','budi.santoso@gmail.com','0812-3456-7890','3174051203990001','4111 1111 1111 1111','Tq8Zp3Lm6Vx9Ra2Cs']
 
 def install(home,both=False):
-    names=['pii_mask_abelion']+(['output_redact_abelion'] if both else [])
+    names=['pii_mask_abelion']
     for p in names:shutil.copytree(SOURCE/p,home/'plugins'/p,ignore=shutil.ignore_patterns('__pycache__','.pytest_cache'))
     return 'plugins:\n  enabled:\n'+''.join('    - '+p.replace('_','-')+'\n' for p in names)+'updates:\n  check: false\nskills:\n  creation_nudge_interval: 0\nmemory:\n  nudge_interval: 0\n'
 

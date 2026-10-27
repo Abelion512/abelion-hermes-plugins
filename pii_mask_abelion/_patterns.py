@@ -1,11 +1,10 @@
 """Shared credential detection patterns — single source of truth.
 
 Digunakan oleh:
-- output_redact_abelion (transform_llm_output hook)
+- pii_mask_abelion.output_redact (held final-output stage)
 - pii_mask_abelion (llm_request middleware)
 
-Jika menambah pattern baru, update FILE INI di kedua direktori.
-Lihat juga: pii_mask_abelion/_patterns.py (identical copy).
+This consolidated plugin uses this one local pattern module.
 """
 
 from __future__ import annotations

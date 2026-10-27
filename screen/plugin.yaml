@@ -1,5 +1,5 @@
 name: screen
-description: "Dashboard tab: live Bot Screen view + Take over / Hand back (noVNC, per-profile)."
+description: "Bot Screen: live virtual desktop view + Take over / Hand back (noVNC, per-profile)."
 version: 0.6.3
 author: Abelion
 kind: standalone

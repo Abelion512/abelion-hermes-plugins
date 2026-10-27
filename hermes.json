@@ -1,43 +1,23 @@
 {
   "name": "abelion-hermes-plugins",
-  "description": "Abelion security & context plugins for Hermes Agent",
+  "description": "Privacy Guard, Bot Screen and 9Router Catalog for Hermes Agent",
   "version": "1.0.0",
   "author": "Abelion",
   "plugins": [
     {
-      "id": "shield-abelion",
-      "path": "shield_abelion",
-      "description": "pre_tool_call: read-before-edit, safety, loop, circuit breaker"
-    },
-    {
       "id": "pii-mask-abelion",
       "path": "pii_mask_abelion",
-      "description": "llm_request middleware: PII masking before provider"
-    },
-    {
-      "id": "output-redact-abelion",
-      "path": "output_redact_abelion",
-      "description": "transform_llm_output: redact credentials from AI response"
-    },
-    {
-      "id": "tool-context-abelion",
-      "path": "tool_context_abelion",
-      "description": "pre_llm_call: datetime + tool reminder to reduce hallucination"
-    },
-    {
-      "id": "rsi-learn-abelion",
-      "path": "rsi_learn_abelion",
-      "description": "pre_llm_call + post_tool_call: RSI lesson extraction"
+      "description": "Privacy Guard: session-bound request/tool masking and held output redaction"
     },
     {
       "id": "9router",
       "path": "model-providers/9router",
-      "description": "9Router model provider (110+ models, oc/*, mmf/*)"
+      "description": "9Router Catalog: validated model discovery; offline curated aliases are unverified"
     },
     {
       "id": "screen",
       "path": "screen",
-      "description": "dashboard plugin: live Bot Screen viewer + Take over / Hand back (noVNC)"
+      "description": "Bot Screen: dashboard view and input takeover for the agent virtual desktop"
     }
   ]
 }

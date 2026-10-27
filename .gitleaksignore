@@ -11,3 +11,6 @@
 45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:generic-api-key:114
 45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:curl-auth-user:82
 45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:github-pat:51
+
+# Exact synthetic classifier-regression canary in the already-pushed test commit.
+579e8c4f52e8bdcf26e1cadc5798cb755071fd90:pii_mask_abelion/tests/test_classifier_case_invariance.py:generic-api-key:87

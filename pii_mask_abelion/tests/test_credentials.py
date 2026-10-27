@@ -275,14 +275,17 @@ def test_deep_nesting_is_masked_not_skipped():
     assert node["n"] == 1 and "[REDACTED]" in node["leaf"] and FAKE not in node["leaf"]
 
 
-def test_unserialisable_depth_is_replaced_not_forwarded():
+def test_extreme_depth_is_masked_or_replaced_never_raw():
+    # Interpreter dependent: older json hits the recursion limit and the subtree is replaced by a
+    # marker, newer ones round-trip it. Either is fine; the raw value must never survive.
     out = pii.pii_middleware({"messages": [], "extra_body": _nest(5000)})["request"]
     node = out["extra_body"]
-    for _ in range(100):
-        if not isinstance(node, dict):
-            break
+    while isinstance(node, dict) and "leaf" not in node:
         node = node["x"]
-    assert node == "[REDACTED]_UNSUPPORTED_STRUCTURE"
+    if isinstance(node, dict):
+        assert "[REDACTED]" in node["leaf"] and FAKE not in node["leaf"]
+    else:
+        assert node == "[REDACTED]_UNSUPPORTED_STRUCTURE"
 
 
 def test_walk_failure_falls_back_to_round_trip(monkeypatch):

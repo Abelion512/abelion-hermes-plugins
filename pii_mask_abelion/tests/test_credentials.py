@@ -195,3 +195,40 @@ def test_pathological_inputs_do_not_blow_up():
         t = time.perf_counter()
         masked(text)
         assert time.perf_counter() - t < 2.0, text[:20]
+
+
+def test_clear_credential_fields_mask_short_and_spaced_values():
+    for text in ("sudo_pass: abc", "SUDO_PASS=x1", "password=12", "lms_pass = 'a b'", 'x-api-key: z',
+                 '{"password": "ab c d"}', "export DB_PASSWORD='two words here'", 'tool --password "my pass phrase" go',
+                 "password: my secret phrase here", "- password: two words", "Lms_Pass = ke ke 12"):
+        out = masked(text)
+        assert MASK in out, text
+        for leak in ("abc", "x1", "12", "a b", "ab c d", "two words", "my pass phrase", "secret phrase", "ke ke"):
+            assert leak not in out.replace("[REDACTED]_SECRET_FIELD", ""), (text, out)
+    out = masked('tool --password "my pass phrase" go')
+    assert out.endswith(' go') and out.startswith('tool --password "')
+    req = {"headers": {"x-api-key": "z"}, "env": {"SUDO_PASS": "ab"}, "messages": [
+        {"role": "assistant", "tool_calls": [{"id": "c", "type": "function", "function": {
+            "name": "f", "arguments": json.dumps({"password": "a b", "note": "hi"})}}]}]}
+    out = pii.pii_middleware(req)["request"]
+    assert out["headers"]["x-api-key"] != "z" and out["env"]["SUDO_PASS"] != "ab"
+    a = json.loads(out["messages"][0]["tool_calls"][0]["function"]["arguments"])
+    assert a["password"] != "a b" and a["note"] == "hi"
+
+
+def test_urlencoded_names_and_ordinary_urls():
+    assert FAKE not in masked(f"https://example.test/cb?api%5Fkey={FAKE}&b=1")
+    assert FAKE not in masked(f"https://example.test/cb?api%255Fkey={FAKE}&b=1")  # double encoded
+    assert masked(f"https://example.test/cb?api%5Fkey={FAKE}&b=1").endswith("&b=1")
+    for ok in ("https://example.test/a%2Fb%255Fc?x=1&q=hello%20world", "https://example.test/search?q=api%5Fkey"):
+        assert masked(ok) == ok
+
+
+def test_source_code_is_not_corrupted():
+    for line in ("api_key: str | None = None,", "worker_api_key = self.api_key", "api_key=api_key,",
+                 "token = uuid.uuid4().hex", "token = get_token()", "self._token_queue: deque = deque()",
+                 "pass_session_id: bool = False,", "set_sudo_password_callback = shim('a', 'b')",
+                 "_TOKEN_QUERY = 0x0008", "sudo_user = os.environ.get('SUDO_USER')",
+                 "if sudo_user == 'root':", "def f(token: Token) -> None:", "_PER_PASS = 1000, 500, 4",
+                 "agent.api_key = effective_key", "client(api_key=token, base_url=u)"):
+        assert masked(line) == line, line

@@ -14,6 +14,7 @@ credential when a segment (or segment pair such as ``api`` + ``key``) says so.
 from __future__ import annotations
 
 import re
+from urllib.parse import unquote
 
 # ── 1. Fixed-prefix token shapes (public formats) ────────────────────────
 # Prefix is literal, the body length floor keeps prose like "hf_x" from matching.
@@ -50,14 +51,22 @@ DISCORD_TOKEN = re.compile(r"\b[MNO][A-Za-z0-9_\-]{23,25}\.[A-Za-z0-9_\-]{6}\.[A
 # ── 2. Field-name driven masking ─────────────────────────────────────────
 # name, separator (quotes allowed so JSON/headers/query/env/CLI all fit), value.
 # Name is bounded to 64 chars; the value excludes whitespace and delimiters.
+_NAME = r"[A-Za-z](?:[A-Za-z0-9_.\-]|%(?:25)?(?:5[Ff]|2[DdEe])){1,63}"  # %5F / %2D / %2E: URL-encoded _ - .
+_VALUE = (r"(?:\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'"  # quoted scalar: whole, spaces included
+          r"|[^\s\"',;&<>{}\[\]()/$=][^\s\"',;&<>{}\[\]()]*)")
 _ASSIGN = re.compile(
-    r"(?P<name>[A-Za-z][A-Za-z0-9_.\-]{1,63})"
-    r"(?P<sep>[\"']?\??[ \t]*(?:[:=]|%3[DdAa])[ \t]*[\"']?)"
-    r"(?P<value>[^\s\"',;&<>{}\[\]()/][^\s\"',;&<>{}\[\]()]{5,})"
+    rf"(?P<name>{_NAME})"
+    r"(?P<sep>[\"']?\??[ \t]*(?:[:=]|%3[DdAa])[ \t]*)"
+    rf"(?P<value>{_VALUE})"
 )
-# CLI flags: --password hunter2, --api-key=abc, -H "x-api-key: abc" is covered by _ASSIGN.
+# Line-start "NAME: several words" / "NAME=several words" (.env, YAML, prose notes): whole rest of the line.
+_LINE = re.compile(
+    rf"(?m)^(?P<name>[ \t]*(?:export[ \t]+|-[ \t]+)?(?P<n>{_NAME})[ \t]*[:=][ \t]*)(?P<value>[^\n\"']{{1,200}})$"
+)
+# CLI flags: --password hunter2, --api-key=abc, --password "my pass phrase".
 _FLAG = re.compile(
-    r"(?P<name>--[A-Za-z][A-Za-z0-9\-]{1,40})(?P<sep>[ =])(?P<value>[^\s\"',;&<>{}\[\]()-][^\s\"',;&<>{}\[\]()]{5,})"
+    rf"(?P<name>--[A-Za-z][A-Za-z0-9\-]{{1,40}})(?P<sep>[ =])(?P<value>\"[^\"\n]{{1,512}}\"|'[^'\n]{{1,512}}'"
+    r"|[^\s\"',;&<>{}\[\]()-][^\s\"',;&<>{}\[\]()]*)"
 )
 
 _SPLIT = re.compile(r"[_.\-]+")
@@ -66,7 +75,7 @@ _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 # Segments that mean "secret value" on their own (after lowercasing).
 _SECRET_SEG = re.compile(
     r"^(?:\w*(?:pass|passw|passwd|password|passwords|pwd|passphrase)|\w*token|\w*secrets?|"
-    r"credential|credentials|apikey|accesskey|privatekey|secretkey|authkey|bearer|sudo)$"
+    r"credential|credentials|apikey|accesskey|privatekey|secretkey|authkey|bearer)$"
 )
 _NOT_SECRET = {"bypass", "compass", "surpass", "trespass", "overpass", "underpass", "tokenizer",
                "tokenize", "secretary", "mypass"}
@@ -87,10 +96,18 @@ _NOT_VALUE_LAST = {"path", "file", "filename", "dir", "folder", "name", "label",
                    "enabled", "hint", "manager", "field", "page", "wiki", "docs", "doc"}
 _NOT_VALUE_ANY = {"count", "limit", "usage", "ttl", "expires", "expiry", "path", "file"}
 
+# Words that may follow the secret segment and still name the secret itself (secret_key, token_value, ...).
+_TAIL_OK = {"key", "value", "val", "str", "string", "text", "hex", "raw", "plain", "v1", "v2", "primary", "secondary"}
+_CODE_WORDS = {"none", "str", "bool", "int", "float", "dict", "list", "bytes", "any", "optional", "callable",
+               "self", "cls", "true", "false", "null", "undefined", "nil"}
+_SNAKE = re.compile(r"^_*[a-z]+(?:_[a-z]+)+_*$")
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$")
+_PASS_FAMILY = re.compile(r"(?:pass|passw|passwd|password|passwords|pwd|passphrase)$")
 _PATH_VALUE = re.compile(r"^(?:\.{0,2}/|~/|[A-Za-z]:\\)[\w./\\ -]+$")
 
 _TYPE_WORDS = frozenset({"string", "number", "integer", "boolean", "object", "array", "null", "none", "true",
-                         "false", "secret", "required", "optional", "str", "bool", "int"})
+                         "false", "secret", "required", "yes", "no", "on", "off", "n/a", "unset", "empty", "optional", "str", "bool", "int"})
 _PEM = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
 _PLACEHOLDER_START = ("[REDACTED", "${", "$(", "{{", "%(", "<", "***", "xxx", "your_", "your-", "changeme")
 
@@ -110,7 +127,9 @@ def classify_field(name: str) -> str | None:
     for i, seg in enumerate(segs):
         if seg in _NOT_SECRET:
             continue
-        if _SECRET_SEG.match(seg) and not (i and segs[i - 1] in _COUNTER_PREV and seg == "token"):
+        if (_SECRET_SEG.match(seg) and not (i and segs[i - 1] in _COUNTER_PREV and seg == "token")
+                and not (i and segs[i - 1] == "per")
+                and all(t in _TAIL_OK or t.isdigit() for t in segs[i + 1:])):
             return "SECRET"
         if seg == "key" and i and _KEY_PREFIX.intersection(segs[:i]):
             return "SECRET"
@@ -139,19 +158,69 @@ def _looks_like_reference(value: str) -> bool:
     return low in _TYPE_WORDS or low.startswith(_PLACEHOLDER_START) or bool(_PATH_VALUE.match(value)) or _plain_url(value)
 
 
-def _sub_assign(m: re.Match) -> str:
-    kind = classify_field(m.group("name"))
+def _label(kind: str) -> str:
+    return "[REDACTED]_SECRET_FIELD" if kind == "SECRET" else "[REDACTED]_ID_FIELD"
+
+
+def _mask_scalar(name: str, value: str) -> str | None:
+    """Replacement for a credential field's value (quotes kept), or None to leave it alone."""
+    kind = classify_field(unquote(unquote(name)))
+    if kind is None:
+        return None
+    quote = value[0] if value[0] in "\"'" else ""
+    inner = value[1:-1] if quote else value
+    if not inner or _looks_like_reference(inner) or inner.startswith("[REDACTED"):
+        return None
+    if kind != "SECRET" and len(inner) < 4:
+        return None
+    return f"{quote}{_label(kind)}{quote}"
+
+
+def _looks_like_code(m: re.Match) -> bool:
+    """Unquoted values that are code, not data: ``x = self.key``, ``token = get()``, ``key: str | None``."""
     value = m.group("value")
-    if kind is None or _looks_like_reference(value):
+    if value[0] in "\"'":
+        return False
+    nxt = m.string[m.end():m.end() + 2]
+    value = value.rstrip("`*.…,")  # prose punctuation hugging the value
+    if not value or value[0] == "…":
+        return True
+    low = value.lower()
+    if low == m.group("name").lower().split("%")[0] or low in _CODE_WORDS or _DOTTED.match(value):
+        return True
+    if value[:1] == "=" or nxt[:1] in ("(", ")", "[") or value in ("0", "1"):
+        return True
+    if nxt[:1] and nxt[:1] in ",}" and _IDENT.match(value) and not any(c.isdigit() for c in value):
+        return True  # {"access_token": token}, f(api_key=token)
+    if _SNAKE.match(value):  # my_var_name: a variable reference, not a value
+        return True
+    if "=" in m.group("sep") and m.group("sep")[:1] == " " and _IDENT.match(value) and not any(c.isdigit() for c in value):
+        return True  # ``api_key = label``: spaced assignment of a plain word is code
+    if ":" in m.group("sep") and nxt[:1] == " " and nxt[1:2].isalpha():  # prose / annotation: "token: foo bar"
+        return True
+    return False
+
+
+def _sub_assign(m: re.Match) -> str:
+    if _looks_like_code(m):
         return m.group(0)
-    label = "SECRET_FIELD" if kind == "SECRET" else "ID_FIELD"
-    return f"{m.group('name')}{m.group('sep')}[REDACTED]_{label}"
+    new = _mask_scalar(m.group("name"), m.group("value"))
+    return m.group(0) if new is None else f"{m.group('name')}{m.group('sep')}{new}"
+
+
+def _sub_line(m: re.Match) -> str:
+    value = m.group("value").rstrip()
+    if not _PASS_FAMILY.search(unquote(m.group("n")).lower()) or " " not in value.strip():  # single token: _ASSIGN already decided
+        return m.group(0)
+    new = _mask_scalar(m.group("n"), value.strip())
+    return m.group(0) if new is None else f"{m.group('name')}{new}"
 
 
 def _sub_flag(m: re.Match) -> str:
-    if classify_field(m.group("name").lstrip("-")) != "SECRET" or _looks_like_reference(m.group("value")):
+    if classify_field(m.group("name").lstrip("-")) != "SECRET":
         return m.group(0)
-    return f"{m.group('name')}{m.group('sep')}[REDACTED]_SECRET_FIELD"
+    new = _mask_scalar(m.group("name").lstrip("-"), m.group("value"))
+    return m.group(0) if new is None else f"{m.group('name')}{m.group('sep')}{new}"
 
 
 def mask_credentials(text: str) -> tuple[str, int]:
@@ -165,6 +234,8 @@ def mask_credentials(text: str) -> tuple[str, int]:
         text, n = _PEM.subn("[REDACTED]_PRIVATE_KEY", text)
         changes += n
     if ":" in text or "=" in text or "%3" in text:
+        text, n = _LINE.subn(_sub_line, text)  # multi-word line values first
+        changes += _count_new(n, text)
         text, n = _ASSIGN.subn(_sub_assign, text)
         changes += _count_new(n, text)
     if "--" in text:
@@ -183,7 +254,7 @@ _AUTH_KEYS = frozenset({"authorization", "proxy-authorization"})
 
 def mask_value_for_key(key: str, value: str) -> tuple[str, int]:
     """Structured data: the field name is a separate dict key, so decide by key. (value, changes)."""
-    if len(value) < 6 or _looks_like_reference(value):
+    if not value or _looks_like_reference(value):
         return value, 0
     low = key.lower()
     if low in _AUTH_KEYS:

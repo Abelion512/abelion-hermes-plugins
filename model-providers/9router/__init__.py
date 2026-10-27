@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 import re
 import urllib.request
 from pathlib import Path
@@ -134,61 +136,48 @@ _CURATED: list[str] = [
     "openrouter/poolside/laguna-xs.2:free",
 ]
 
-# Known virtual prefixes — models that 9Router routes even though
-# they don't appear in /v1/models listing. Any model with these
-# prefixes is automatically included in the picker.
-_VIRTUAL_PREFIXES = ("oc/", "mmf/")
-
 # Cache
 _discovered: list[str] | None = None
+_discovered_at = 0.0
+_CACHE_SECONDS = 60.0
 
 
 def _fetch_models(timeout: float = 5.0) -> list[str] | None:
     """Fetch model list from 9Router /v1/models."""
     try:
-        req = urllib.request.Request(
-            f"{BASE_URL}/models",
-            headers={"Accept": "application/json"},
-        )
+        headers = {"Accept": "application/json"}
+        key = os.environ.get("NINEROUTER_API_KEY") or os.environ.get("NINEROUTER_KEY")
+        if key:
+            headers["Authorization"] = "Bearer " + key
+        req = urllib.request.Request(f"{BASE_URL}/models", headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            payload = json.loads(resp.read().decode())
-        items = payload.get("data", [])
+            raw=resp.read(1_048_577)
+            if len(raw)>1_048_576:return None
+            payload = json.loads(raw.decode())
+        if not isinstance(payload,dict):return None
+        items = payload.get("data")
         if isinstance(items, list):
-            ids = [m["id"] for m in items if isinstance(m, dict) and m.get("id")]
-            if ids:
-                return ids
+            ids = list(dict.fromkeys(m["id"] for m in items
+                if isinstance(m,dict) and isinstance(m.get("id"),str)
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,255}",m["id"])))
+            return ids if ids or not items else None
     except Exception as exc:
         logger.debug("[9router] /v1/models fetch failed: %s", exc)
     return None
 
 
 def get_available_models() -> list[str]:
-    """Return model IDs available on this 9Router instance.
-
-    Menggabungkan live /v1/models + static _CURATED (yang includes oc/*, mmf/*)
-    + wildcard: ANY model with a known virtual prefix (oc/, mmf/) is auto-added
-    so new variants (e.g. oc/gpt-5.6) appear without manual curated update.
-    Cached per-process.
-    """
-    global _discovered
-    if _discovered is None:
+    """Use the validated live catalog; offline curated entries are unverified fallback."""
+    global _discovered, _discovered_at
+    now = time.monotonic()
+    if _discovered is None or now - _discovered_at >= _CACHE_SECONDS:
         live = _fetch_models()
-        if live:
-            seen = set(live)
-            # Add curated entries not in live list
-            for m in _CURATED:
-                if m not in seen:
-                    live.append(m)
-                    seen.add(m)
-            # Add any prefix-stub for virtual routes (oc/*, mmf/*)
-            for prefix in _VIRTUAL_PREFIXES:
-                stub = f"{prefix}*"
-                if stub not in seen:
-                    live.append(stub)
-                    seen.add(stub)
+        if live is not None:
             _discovered = live
         else:
+            logger.warning("[9router] Live catalog unavailable; curated fallback is unverified")
             _discovered = list(_CURATED)
+        _discovered_at = now
     return list(_discovered)
 
 
@@ -206,7 +195,7 @@ try:
         models_url=BASE_URL + "/models",
         fallback_models=tuple(get_available_models()),
         auth_type="api_key",
-        env_vars=("NINEROUTER_API_KEY",),
+        env_vars=("NINEROUTER_API_KEY", "NINEROUTER_KEY"),
     )
     from providers import register_provider
 
@@ -214,3 +203,31 @@ try:
     logger.info("[9router] Registered as provider with %d models", len(get_available_models()))
 except Exception as exc:
     logger.warning("[9router] Failed to register: %s", exc)
+
+
+
+# ── Bundled agent skills ─────────────────────────────────────────────
+# The provider profile above self-registers at import time; register(ctx)
+# only publishes skills/*/SKILL.md (guarded for hosts without register_skill).
+
+_SKILL_DESCRIPTIONS = {
+    "model-picker": "Pick and use 9Router provider models in Hermes.",
+}
+
+
+def register(ctx):
+    register_skill = getattr(ctx, "register_skill", None)
+    if register_skill is None:
+        logger.info("[9router] host has no ctx.register_skill; bundled skills skipped")
+        return
+    skills_dir = Path(__file__).resolve().parent / "skills"
+    if not skills_dir.is_dir():
+        return
+    for child in sorted(skills_dir.iterdir()):
+        skill_md = child / "SKILL.md"
+        if child.is_dir() and skill_md.is_file():
+            register_skill(
+                name=child.name,
+                path=skill_md,
+                description=_SKILL_DESCRIPTIONS.get(child.name, ""),
+            )

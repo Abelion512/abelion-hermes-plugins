@@ -82,7 +82,7 @@ def on_tool_result(tool_name: str, status: str, **kwargs) -> None:
     breaker = get_breaker(tool_name)
     if status == "error":
         breaker.record_failure()
-    elif status == "success":
+    elif status in {"ok","success"}:
         breaker.record_success()
 
 

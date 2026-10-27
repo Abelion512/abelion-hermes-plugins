@@ -121,6 +121,11 @@ def _segments(name: str) -> list[str]:
 
 def classify_field(name: str) -> str | None:
     """Return "SECRET", "IDENTIFIER" or None for a field/variable name."""
+    # Case-insensitive delimited field vocabulary before camel-case expansion.
+    literal = [p.lower() for p in _SPLIT.split(name) if p]
+    if literal and literal[-1] not in _NOT_VALUE_LAST and not _NOT_VALUE_ANY.intersection(literal):
+        if any(a == "api" and b == "key" for a,b in zip(literal,literal[1:])):
+            return "SECRET"
     segs = _segments(name)
     if not segs or segs[-1] in _NOT_VALUE_LAST or _NOT_VALUE_ANY.intersection(segs):
         return None

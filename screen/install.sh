@@ -48,6 +48,13 @@ mkdir -p "$DEST/screen"
 cp -r dashboard "$DEST/screen/dashboard"
 cp -f plugin.yaml "$DEST/screen/plugin.yaml" 2>/dev/null || true
 cp -f __init__.py "$DEST/screen/__init__.py" 2>/dev/null || true
+if [ -d skills ]; then
+  cp -r skills "$DEST/screen/skills"
+  echo ">> skills agent tersalin ke $DEST/screen/skills"
+fi
+if [ -f README.md ]; then
+  cp -f README.md "$DEST/screen/README.md" 2>/dev/null || true
+fi
 echo ">> plugin tersalin ke $DEST/screen"
 
 json="["; first=1

@@ -1,8 +1,8 @@
 name: pii-mask-abelion
-description: "llm_request middleware: mask PII, secrets, and credentials before sending to provider."
-version: 1.0.0
+description: "Local redact: required privacy policy, request masking, destination-limited tools and held output."
+version: 1.1.0-test
 author: Abelion
-kind: general
+kind: standalone
 metadata:
   hermes:
     category: security

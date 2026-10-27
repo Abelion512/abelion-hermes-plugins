@@ -307,12 +307,18 @@ async def lease(request: Request, action: str):
     # Hermes Desktop, the phone) - the plugin cannot tell them apart, so a
     # generic Hand back must never escalate on its own.
     force = False
-    if action == "release":
-        try:
-            body = await request.json()
-        except Exception:
-            body = None
-        force = isinstance(body, dict) and body.get("force") is True
+    raw=await request.body()
+    if raw:
+        try:body=json.loads(raw)
+        except (ValueError,UnicodeError):
+            return JSONResponse({"ok":False,"error":"invalid_json"},status_code=422)
+        if not isinstance(body,dict) or set(body)-{"force"}:
+            return JSONResponse({"ok":False,"error":"unsupported_lease_fields"},status_code=422)
+        if "force" in body and type(body["force"]) is not bool:
+            return JSONResponse({"ok":False,"error":"force_must_be_boolean"},status_code=422)
+        force=body.get("force",False)
+        if force and action!="release":
+            return JSONResponse({"ok":False,"error":"force_only_for_release"},status_code=422)
     # If the live connection never minted our id (reconnect), re-observe
     # first: that also refreshes ticket + identity.
     if _rpc is not None and _viewer_id not in _rpc.minted_ids:

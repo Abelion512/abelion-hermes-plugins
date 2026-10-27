@@ -57,6 +57,8 @@ def pre_llm_hook(**kwargs: Any) -> dict | None:
 
 def post_tool_call_hook(**kwargs: Any) -> None:
     global _session_id, _session_metrics
+    if kwargs.get("status") not in {"ok","success","error"}:return
+    if not isinstance(kwargs.get("tool_name"),str) or not kwargs["tool_name"].strip():return
     if not _session_metrics:
         _reset_session()
     _session_metrics["tool_calls_total"] += 1

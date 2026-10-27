@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 
 logger = logging.getLogger(__name__)
 
@@ -41,21 +42,47 @@ class ActiveLoopDetector:
         self.action_history.clear()
 
 
-_detector = ActiveLoopDetector()
+# One detector per session so parallel sessions don't trip each other's loop check.
+# Bounded (oldest session dropped) so a long-running gateway can't grow it forever.
+_MAX_SESSIONS = 64
+_detectors: "OrderedDict[str, ActiveLoopDetector]" = OrderedDict()
+_lock = threading.Lock()
+_detector = ActiveLoopDetector()  # fallback when the hook gives no session id
+
+
+def _get_detector(session_id: str = "") -> ActiveLoopDetector:
+    if not session_id:
+        return _detector
+    with _lock:
+        det = _detectors.get(session_id)
+        if det is None:
+            det = _detectors[session_id] = ActiveLoopDetector()
+            while len(_detectors) > _MAX_SESSIONS:
+                _detectors.popitem(last=False)
+        else:
+            _detectors.move_to_end(session_id)
+        return det
 
 
 def reset_detector() -> None:
     _detector.reset()
+    with _lock:
+        _detectors.clear()
 
 
 def snapshot() -> dict:
     """Dump loop detector state to JSON. Returns snapshot dict."""
+    with _lock:
+        tracked = list(_detectors.values())
+    tracked.append(_detector)  # fallback detector (hook calls without a session id)
+    newest = next((d for d in reversed(tracked) if d.action_history), _detector)
     data = {
         "timestamp": time.time(),
         "max_similar_actions": _detector.max_similar_actions,
         "window_size": _detector.window_size,
-        "history_size": len(_detector.action_history),
-        "recent": list(_detector.action_history)[-5:],
+        "sessions": len(tracked) - 1,
+        "history_size": sum(len(d.action_history) for d in tracked),
+        "recent": list(newest.action_history)[-5:],
     }
     base = os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes"))
     dest = os.path.join(base, "shield", "protect", "loop_detector.json")
@@ -65,19 +92,20 @@ def snapshot() -> dict:
     return data
 
 
-def check_and_block(tool_name: str, args: dict) -> dict | None:
+def check_and_block(tool_name: str, args: dict, session_id: str = "") -> dict | None:
     """pre_tool_call hook. Returns block directive if loop detected."""
-    _detector.add_action(tool_name, args)
-    if _detector.is_looping():
+    det = _get_detector(session_id)
+    det.add_action(tool_name, args)
+    if det.is_looping():
         logger.warning(
             "[protect] Blocking loop: %s called %d+ times with identical args",
-            tool_name, _detector.max_similar_actions,
+            tool_name, det.max_similar_actions,
         )
         return {
             "action": "block",
             "message": (
                 f"🛑 Infinite loop detected: `{tool_name}` called "
-                f"{_detector.max_similar_actions}+ times with same arguments. "
+                f"{det.max_similar_actions}+ times with same arguments. "
                 f"Try a different approach."
             ),
         }

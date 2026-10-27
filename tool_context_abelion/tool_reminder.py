@@ -1,6 +1,6 @@
 """Context reminder — pre_llm_call hook.
 
-Inject per-turn context: datetime, tool availability, execution mandate.
+Inject per-turn datetime and verified tool-availability context.
 Tujuan:
 1. Date/time — cegah AI hallucination soal tanggal hari ini
 2. Tool reminder — AI tau tools apa tersedia, jangan suruh user run command manual
@@ -16,23 +16,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ── Tool manifest ──────────────────────────────────────────────────────
-# Compact, grouped by use case. Update saat plugin list berubah.
-_TOOL_MAP = """
-• web: web_research, web_extract
-• doc internal: knowledge_search (RAG)
-• jadwal: schedule_add, schedule_list, schedule_remove
-• goal: evey_goals
-• model lain: delegate_with_model, delegate_parallel
-• belajar: learn_from_interaction, reflect_on_output, validate_output
-• memory: memory_search (hindsight recall)
-""".strip()
-
-_CONTEXT_TEMPLATE = """\
-[Context: {datetime}
-You can execute ALL of the following yourself via tools — NEVER ask the user to run commands on their terminal.
-{tools}
-Before making a plan, first scan available tools (the complete list is in your system prompt). 
-Plan around what tools you actually have, not hypothetical steps.]"""
+# Name tools only when the caller supplies a valid inventory.
+_CONTEXT_TEMPLATE = """[Context: {datetime}
+Use only tools actually available in the current session. Check their schemas and
+required values before calling them. Wrong or unsupported values need correction,
+not silent coercion. Do not claim a tool ran or ask the user to test portable work
+that you can test yourself. Account access and approvals are separate requirements.
+{tools}]"""
 
 
 def tool_reminder(**kwargs: Any) -> dict[str, Any] | None:
@@ -47,6 +37,11 @@ def tool_reminder(**kwargs: Any) -> dict[str, Any] | None:
         return None
 
     now = datetime.now(timezone.utc).strftime("%a %Y-%m-%d %H:%M UTC")
-    context = _CONTEXT_TEMPLATE.format(datetime=now, tools=_TOOL_MAP)
+    available=kwargs.get("available_tools")
+    if isinstance(available,list) and all(isinstance(n,str) and n.strip() for n in available):
+        tools="Reported session tools: "+", ".join(dict.fromkeys(available))
+    else:
+        tools="No tool inventory supplied by this hook; use the host's session tool list."
+    context = _CONTEXT_TEMPLATE.format(datetime=now, tools=tools)
 
     return {"context": context}

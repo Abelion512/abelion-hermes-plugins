@@ -18,7 +18,7 @@ from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 logger = logging.getLogger(__name__)
 
 
-def redact_output(response_text: str) -> str | None:
+def redact_output(response_text: str, **kwargs) -> str | None:
     """Redact credentials from LLM final response.
 
     Returns redacted string if changes made, ``None`` if nothing to redact
@@ -29,6 +29,22 @@ def redact_output(response_text: str) -> str | None:
     2. Delegates to Hermes' builtin ``redact_sensitive_text`` (catches env
        vars, API keys, JWTs, auth headers, DB connstrings, etc.)
     """
+    if not isinstance(response_text,str):
+        return "[OUTPUT_WITHHELD:invalid_text]"
+    if not response_text:
+        return None
+    # A loaded privacy guard owns the held final and its session-local map.
+    # Plugin module namespaces are profile-specific; inspect the current manager,
+    # never import a second guard instance with an unrelated mapping.
+    try:
+        from hermes_cli.plugins import get_plugin_manager
+        manager = get_plugin_manager()
+        for callback in manager._hooks.get("transform_llm_output", []):
+            owner = getattr(callback, "__self__", None)
+            if owner is not None and type(owner).__name__ == "Guard" and callback.__name__ == "output":
+                return None
+    except ImportError:
+        pass
     if not response_text:
         return None
 
@@ -54,9 +70,10 @@ def redact_output(response_text: str) -> str | None:
             changed = True
     except ImportError:
         # Running outside Hermes (tests, standalone) — skip builtin
-        pass
+        return "[OUTPUT_WITHHELD:redactor_unavailable]"
     except Exception as exc:
-        logger.warning("[output_redact] redact_sensitive_text failed: %s", exc)
+        logger.warning("[output_redact] native redactor failed (%s)",type(exc).__name__)
+        return "[OUTPUT_WITHHELD:redactor_failed]"
 
     if changed:
         logger.info("[output_redact] Redacted %d pattern(s) in LLM response (%d parenthetical)", n, n > 0)

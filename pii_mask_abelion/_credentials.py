@@ -70,7 +70,6 @@ _FLAG = re.compile(
 )
 
 _SPLIT = re.compile(r"[_.\-]+")
-_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 # Segments that mean "secret value" on their own (after lowercasing).
 _SECRET_SEG = re.compile(
@@ -112,16 +111,69 @@ _PEM = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-
 _PLACEHOLDER_START = ("[REDACTED", "${", "$(", "{{", "%(", "<", "***", "xxx", "your_", "your-", "changeme")
 
 
+# Case is not a reliable word boundary: paSsWOrD and CoMPASs must not
+# gain a new meaning. Recognize the existing bounded field vocabulary instead.
+_FIELD_WORDS = frozenset(
+    _NOT_VALUE_LAST | _NOT_VALUE_ANY | _COUNTER_PREV | _TAIL_OK | _KEY_PREFIX
+    | _NOT_SECRET | {"client", "app", "public", "account", "id", "sid", "email", "per",
+                     "pass", "passw", "passwd", "password", "passwords", "pwd",
+                     "passphrase", "token", "tokens", "secret", "secrets",
+                     "credential", "credentials", "bearer"}
+)
+_FIELD_WORD_ORDER = tuple(sorted(_FIELD_WORDS - {"filename"},
+                                 key=lambda word: (word in {"tokens", "secrets", "passwords"}, -len(word), word)))
+
+
 def _segments(name: str) -> list[str]:
     parts: list[str] = []
-    for chunk in _SPLIT.split(name):
-        parts.extend(p.lower() for p in _CAMEL.split(chunk) if p)
+    for chunk in _SPLIT.split(name.lower()):
+        if not chunk:
+            continue
+        if len(chunk) > 128:
+            parts.append(chunk)
+            continue
+        # Whole-word exceptions must win over shorter credential suffixes.
+        if chunk in _NOT_SECRET or chunk in _FIELD_WORDS:
+            parts.append(chunk)
+            continue
+        # Prefer a complete vocabulary parse over a greedy prefix: tokenSecret
+        # is token + secret, not tokens + an unknown "ecret" suffix.
+        parsed: dict[int, list[str]] = {len(chunk): []}
+        for index in range(len(chunk) - 1, -1, -1):
+            for word in _FIELD_WORD_ORDER:
+                end = index + len(word)
+                if chunk.startswith(word, index) and end in parsed:
+                    parsed[index] = [word, *parsed[end]]
+                    break
+        if 0 in parsed:
+            parts.extend(parsed[0])
+            continue
+        # An unknown vendor prefix may precede known semantic words.
+        offset = next((index for index in range(1, len(chunk)) if index in parsed), None)
+        if offset is not None and not any(chunk.startswith(word) for word in _FIELD_WORD_ORDER):
+            parts.extend([chunk[:offset], *parsed[offset]])
+        else:
+            # Preserve recognized words around unknown vendor text too.
+            while chunk:
+                word = next((word for word in _FIELD_WORD_ORDER if chunk.startswith(word)), None)
+                if word is not None:
+                    parts.append(word)
+                    chunk = chunk[len(word):]
+                    continue
+                offset = next((index for index in range(1, len(chunk))
+                               if any(chunk.startswith(word, index) for word in _FIELD_WORD_ORDER)), None)
+                if offset is None:
+                    parts.append(chunk)
+                    break
+                parts.append(chunk[:offset])
+                chunk = chunk[offset:]
+
     return parts
 
 
 def classify_field(name: str) -> str | None:
     """Return "SECRET", "IDENTIFIER" or None for a field/variable name."""
-    # Case-insensitive delimited field vocabulary before camel-case expansion.
+    # Case-insensitive delimited vocabulary before semantic segmentation.
     literal = [p.lower() for p in _SPLIT.split(name) if p]
     if literal and literal[-1] not in _NOT_VALUE_LAST and not _NOT_VALUE_ANY.intersection(literal):
         if any(a == "api" and b == "key" for a,b in zip(literal,literal[1:])):

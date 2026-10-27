@@ -2,6 +2,7 @@ import sys,os,tempfile,importlib.util,json,asyncio,types
 from pathlib import Path
 from unittest.mock import patch
 import pytest
+pytest.importorskip("hermes_constants", reason="cross-plugin integration requires matching Hermes checkout; see docs/DELIVERY.md")
 BASE=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BASE));os.environ['HERMES_HOME']=tempfile.mkdtemp(prefix='algo-tests-')
 from pii_mask_abelion.guard import Guard
 import shield_abelion as shield

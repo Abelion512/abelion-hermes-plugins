@@ -61,7 +61,12 @@ def test_no_change_returns_none():
 
 def test_output_redact_paren_and_plain():
     assert "hunter2" not in out.redact_output("admin (username) / hunter2 (password nya)")
-    assert out.redact_output("just a normal answer (see above)") is None
+    try:
+        import agent.redact  # the core redactor is an explicit runtime dependency
+    except ImportError:
+        assert out.redact_output("just a normal answer (see above)") == "[OUTPUT_WITHHELD:redactor_unavailable]"
+    else:
+        assert out.redact_output("just a normal answer (see above)") is None
 
 
 # ── Equivalence against an unfiltered reference (the pre-filter must never change results) ──

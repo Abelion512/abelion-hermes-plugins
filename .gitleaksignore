@@ -1,2 +1,13 @@
 # Test fixture in an already-pushed commit (fake token, not a real secret)
 0449e419b12baad28241fb9bba1c9acfd2d5ef53:pii_mask_abelion/tests/test_pii_middleware.py:generic-api-key:15
+
+# Synthetic privacy-test canaries in published commit45eaf07 only. No path/rule exemptions.
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard_runtime.py:generic-api-key:20
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard_stream.py:generic-api-key:13
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard_stream.py:generic-api-key:43
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard_stream.py:github-pat:12
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:generic-api-key:51
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:generic-api-key:106
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:generic-api-key:114
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:curl-auth-user:82
+45eaf077fb9a7b151571aa0064afe540dca491b4:pii_mask_abelion/tests/test_guard.py:github-pat:51

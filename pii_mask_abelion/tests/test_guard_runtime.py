@@ -17,7 +17,7 @@ def install(home,both=False):
 def test_request_and_tool_replay(tmp_path,both):
     h=tmp_path/'home'/'.hermes';ws=tmp_path/'private-workspace';ws.mkdir()
     text=f'api_key={CANARIES[0]} acme_secret_blob={CANARIES[1]} email {CANARIES[2]} phone {CANARIES[3]} NIK {CANARIES[4]} card {CANARIES[5]} /home/abelion/private/project'
-    script=[ToolCall('terminal',{'command':'printf "ok"; echo --token '+CANARIES[6]}),Text('openweather_api_key="Hy4Nb7Kd1Wf5Gz8Xe"')]
+    script=[ToolCall('terminal',{'command':'printf "ok"; echo --token '+CANARIES[6]}),Text('openweather_api_key="Hy4Nb7Kd1Wf5Gz8Xe"')]  # gitleaks:allow (synthetic privacy test canary)
     with FakeLLMServer(script) as srv:
         write_hermes_home(h,srv.base_url,extra_config=install(h,both))
         result=run_hermes(['chat','-q',text,'-Q'],tmp_path/'home',cwd=ws,timeout=90)
@@ -26,7 +26,7 @@ def test_request_and_tool_replay(tmp_path,both):
     wire=json.dumps(requests)
     assert all(v not in wire for v in CANARIES)
     assert '/home/abelion/private/project' not in wire and 'private-workspace' not in wire
-    assert 'Hy4Nb7Kd1Wf5Gz8Xe' not in result.stdout
+    assert 'Hy4Nb7Kd1Wf5Gz8Xe' not in result.stdout  # gitleaks:allow (synthetic privacy test canary)
 
 
 def test_placeholder_read_file_roundtrip(tmp_path):

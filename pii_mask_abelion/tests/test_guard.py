@@ -48,7 +48,7 @@ def test_url_unchanged_path_hidden():
 
 def test_prefix_secret_and_indonesian_pii():
     g=Guard();s=g.session('a')
-    for text in ['acme_secret_blob=Zk7Qm2Wp9Rt4Lx8vN5','phone 0812-3456-7890','card 4111 1111 1111 1111','NIK 3174051203990001','key ghp_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2']:
+    for text in ['acme_secret_blob=Zk7Qm2Wp9Rt4Lx8vN5','phone 0812-3456-7890','card 4111 1111 1111 1111','NIK 3174051203990001','key ghp_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2']:  # gitleaks:allow (synthetic privacy test canary)
         assert g.text(text,s)!=text
 
 def test_review_partial_tail_and_short_values():
@@ -79,7 +79,7 @@ def test_scan_budget_before_work_and_short_flags():
     for text in ['http://'*16000,'password=a\n'*16000]:
         t=time.monotonic();out=Guard().request({'m':text},session_id='a');assert time.monotonic()-t<1
         assert text not in str(out)
-    for text,raw in [('curl -u admin:pw123 http://h','admin:pw123'),('mysql -pSecret123 db','Secret123'),('/home/abelion/a b/c.txt','b/c.txt')]:
+    for text,raw in [('curl -u admin:pw123 http://h','admin:pw123'),('mysql -pSecret123 db','Secret123'),('/home/abelion/a b/c.txt','b/c.txt')]:  # gitleaks:allow (synthetic privacy test canary)
         assert raw not in str(Guard().request({'m':text},session_id='a'))
 
 def test_dense_text_and_cumulative_payload_budget():
@@ -103,15 +103,15 @@ def test_required_oversize_denies_without_corrupting_request():
 def test_required_control_secret_denies_but_content_masks():
     guard=Guard()
     assert guard.required_policy('request',request={'model':'test','extra_headers':{'Authorization':'Bearer opaque-secret-abcdefghijk'}},session_id='required')=={'allow':False}
-    result=guard.required_policy('request',request={'model':'test','messages':[{'role':'user','content':'api_key=OpaqueZ9p4X6v8Q2'}]},session_id='required')
+    result=guard.required_policy('request',request={'model':'test','messages':[{'role':'user','content':'api_key=OpaqueZ9p4X6v8Q2'}]},session_id='required')  # gitleaks:allow (synthetic privacy test canary)
     assert result['allow'] is True
-    assert 'OpaqueZ9p4X6v8Q2' not in str(result)
+    assert 'OpaqueZ9p4X6v8Q2' not in str(result)  # gitleaks:allow (synthetic privacy test canary)
 
 
 def test_required_capacity_recovery_is_new_session_not_eviction():
     guard=Guard(max_entries=1)
-    first={'model':'test','messages':[{'role':'user','content':'api_key=FirstOpaqueX9t7a5v3'}]}
-    second={'model':'test','messages':[{'role':'user','content':'password=SecondOpaqueX9t7a5v3'}]}
+    first={'model':'test','messages':[{'role':'user','content':'api_key=FirstOpaqueX9t7a5v3'}]}  # gitleaks:allow (synthetic privacy test canary)
+    second={'model':'test','messages':[{'role':'user','content':'password=SecondOpaqueX9t7a5v3'}]}  # gitleaks:allow (synthetic privacy test canary)
     assert guard.required_policy('request',request=first,session_id='A')['allow']
     assert guard.required_policy('request',request=second,session_id='A')['allow'] is False
     assert guard.required_policy('request',request=second,session_id='B')['allow']

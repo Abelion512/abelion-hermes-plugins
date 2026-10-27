@@ -19,6 +19,7 @@ import logging
 import re
 from typing import Any, Optional
 
+from ._credentials import mask_credentials
 from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 
 logger = logging.getLogger(__name__)
@@ -39,12 +40,10 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)(?:sk|pk)-[a-z0-9]{4,}'), "OPENAI_KEY"),
     # GitHub tokens
     (re.compile(r'(?i)ghp_[a-z0-9]{8,}|gho_[a-z0-9]{8,}|ghu_[a-z0-9]{8,}'), "GITHUB_TOKEN"),
-    # Environment variable patterns (KEY=value)
-    (re.compile(r'(?i)(api[_-]?key|apikey|secret|token|password)\s*[:=]\s*["\']?[a-z0-9_\-]{8,}["\']?'), "SECRET_CRED"),
+    # KEY=value assignments are handled by mask_credentials (value only, field name kept)
     # Bare secret values (long alphanumeric preceded by "secret", "token", "password" or similar)
-    (re.compile(r'(?i)\bsecret[a-z0-9_\-]{8,}\b|GITHUB_TOKEN|SUPER_SECRET|supersecret'), "BARE_SECRET"),
-    # .env style (whole line)
-    (re.compile(r'^\s*(?:export\s+)?(?:\w+)_(?:API_KEY|TOKEN|PASSWORD|SECRET)\s*[:=].+', re.MULTILINE), "ENV_ENTRY"),
+    (re.compile(r'(?i)\bsecret(?=[a-z_\-]*\d)[a-z0-9_\-]{8,}\b|supersecret'), "BARE_SECRET"),
+    # .env style lines are handled by mask_credentials (value only, field name kept)
     # Prose credential annotations: ``value (password)``, ``user (username)``
     # Catches credentials labeled in free-form prose before reaching provider.
     # Pattern imported from _patterns.py (shared with output_redact_abelion).
@@ -105,8 +104,8 @@ def mask_content(text: str, mask_char: str = "[REDACTED]") -> str:
 
     Returns (masked_text, changes) where changes is a count of replacements.
     """
-    changes = 0
-    result = text
+    # Credential names/values first: keeps the field name and masks only the value.
+    result, changes = mask_credentials(text)
 
     for pattern, label in SECRET_PATTERNS:
         if pattern is PAREN_CRED_RE and not PAREN_LABEL_RE.search(result):
@@ -128,58 +127,90 @@ def _mask_match(match: re.Match, label: str, mask_char: str) -> str:
 
 # ── Middleware ─────────────────────────────────────────────────────────
 
+# Strings under these keys are structure, not content: never rewritten.
+_SKIP_KEYS = frozenset({
+    "role", "type", "id", "name", "model", "tool_call_id", "call_id", "tool_use_id", "mime_type",
+    "media_type", "finish_reason", "tool_choice", "stream", "stream_options", "tools", "functions",
+    "image_url", "image", "data", "b64_json", "file_data", "audio", "input_audio", "source",
+})
+
+
+def _mask_json_string(text: str):
+    """Tool-call ``arguments`` are JSON text: mask the string leaves so the JSON stays valid."""
+    try:
+        parsed = json.loads(text)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(parsed, (dict, list)):
+        return None
+    new, count = _mask_obj(parsed)
+    if count == 0:
+        return text, 0
+    return json.dumps(new, ensure_ascii=False), count
+
+
+def _mask_obj(value: Any, key: str = ""):
+    """Copy-on-write walk: returns (value, masked_count); unchanged objects are returned as is."""
+    if isinstance(value, str):
+        if not value or key in _SKIP_KEYS or value.startswith("data:"):
+            return value, 0
+        if key == "arguments" and value[:1] in "{[":
+            res = _mask_json_string(value)
+            if res is not None:
+                return res
+        masked, count = mask_content(value)
+        return (masked, count) if count else (value, 0)
+    if isinstance(value, dict):
+        out = None
+        total = 0
+        for k, v in value.items():
+            if k in _SKIP_KEYS and not isinstance(v, (dict, list)):
+                continue
+            if k in ("tools", "functions", "image_url", "source", "input_audio"):
+                continue
+            new, count = _mask_obj(v, k if isinstance(k, str) else "")
+            if count:
+                if out is None:
+                    out = dict(value)
+                out[k] = new
+                total += count
+        return (out, total) if out is not None else (value, 0)
+    if isinstance(value, list):
+        out = None
+        total = 0
+        for i, v in enumerate(value):
+            new, count = _mask_obj(v, key)
+            if count:
+                if out is None:
+                    out = list(value)
+                out[i] = new
+                total += count
+        return (out, total) if out is not None else (value, 0)
+    return value, 0
+
+
 def pii_middleware(
     request: dict[str, Any],
     original_request: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any] | None:
-    """LLM request middleware: mask PII in messages before provider.
+    """LLM request middleware: mask PII and credentials in the outgoing request.
+
+    Walks the WHOLE request (messages, tool-call arguments, system/instructions/input and
+    other provider-specific fields), not just ``messages[].content``. Tool schemas, ids,
+    roles, model names and binary/image data are left alone. Copy-on-write: the caller's
+    request is never mutated.
 
     Register via ctx.register_middleware("llm_request", pii_middleware).
     Returns {"request": new_request} if changes made, None otherwise.
     """
-    messages = request.get("messages", [])
-    if not messages:
+    if not isinstance(request, dict) or not request:
         return None
-
-    total_masked = 0
-    new_messages = []
-    for msg in messages:
-        content = msg.get("content", "")
-        new_msg = msg
-        if isinstance(content, list):
-            # Multi-part content (tool results, images, etc.)
-            new_parts = None
-            for i, part in enumerate(content):
-                if isinstance(part, dict) and part.get("type") == "text":
-                    masked, count = mask_content(part.get("text", ""))
-                    if count > 0:
-                        if new_parts is None:
-                            new_parts = list(content)
-                        new_parts[i] = {**part, "text": masked}
-                        total_masked += count
-            if new_parts is not None:
-                new_msg = {**msg, "content": new_parts}
-        elif isinstance(content, str):
-            masked, count = mask_content(content)
-            if count > 0:
-                new_msg = {**msg, "content": masked}
-                total_masked += count
-        new_messages.append(new_msg)
-
-    changed = total_masked > 0
-    # Copy-on-write: the caller's request is never mutated.
-    new_request = {**request, "messages": new_messages} if changed else None
-    sensitivity = CONFIDENTIAL if changed else PUBLIC
-
-    if changed:
-        logger.info(
-            "[PII] Masked %d items in request (level=%s)",
-            total_masked, sensitivity,
-        )
-        return {"request": new_request}
-
-    return None
+    new_request, total_masked = _mask_obj(request)
+    if total_masked == 0:
+        return None
+    logger.info("[PII] Masked %d items in request (level=%s)", total_masked, CONFIDENTIAL)
+    return {"request": new_request}
 
 
 # ── Standalone scan (stateless, for testing) ───────────────────────────

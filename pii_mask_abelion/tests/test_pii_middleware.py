@@ -71,7 +71,7 @@ import random
 
 def _ref_mask(text):
     """Reference: every pattern applied with no pre-filter (the old behavior)."""
-    n = 0
+    text, n = pii.mask_credentials(text)
     for pattern, label in pii.SECRET_PATTERNS:
         text, c = pattern.subn(lambda m, label=label: f"[REDACTED]_{label}", text)
         n += c

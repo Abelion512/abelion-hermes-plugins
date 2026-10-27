@@ -133,7 +133,7 @@ _SKIP_KEYS = frozenset({
     "media_type", "finish_reason", "tool_choice",
 })
 # Binary payloads: opaque, left alone (a known gap: secrets inside images/audio are not inspected).
-_BINARY_KEYS = frozenset({"data", "b64_json", "file_data", "audio", "bytes"})
+_BINARY_KEYS = frozenset({"data", "b64_json", "file_data", "audio", "bytes", "signature", "encrypted_content"})
 _VALUE_KEYS = frozenset({"default", "example", "examples", "const", "value"})
 _B64 = re.compile(r"[A-Za-z0-9+/=_\-]{128,}")
 

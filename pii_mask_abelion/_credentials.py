@@ -223,6 +223,26 @@ def _sub_flag(m: re.Match) -> str:
     return m.group(0) if new is None else f"{m.group('name')}{m.group('sep')}{new}"
 
 
+def _scan_assign(text: str) -> str:
+    """Like ``_ASSIGN.sub`` but a rejected match does not swallow its value: ``out: password: x`` still
+    reaches the inner ``password: x`` (non-overlapping matching would skip it)."""
+    out: list[str] = []
+    pos = last = 0
+    while True:
+        m = _ASSIGN.search(text, pos)
+        if m is None:
+            break
+        new = _sub_assign(m)
+        if new == m.group(0):
+            pos = max(m.start("value"), m.start() + 1)
+            continue
+        out.append(text[last:m.start()])
+        out.append(new)
+        pos = last = m.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
 def mask_credentials(text: str) -> tuple[str, int]:
     """Mask vendor token shapes and credential field VALUES. Returns (text, changes)."""
     changes = 0
@@ -236,8 +256,8 @@ def mask_credentials(text: str) -> tuple[str, int]:
     if ":" in text or "=" in text or "%3" in text:
         text, n = _LINE.subn(_sub_line, text)  # multi-word line values first
         changes += _count_new(n, text)
-        text, n = _ASSIGN.subn(_sub_assign, text)
-        changes += _count_new(n, text)
+        text = _scan_assign(text)
+        changes += _count_new(1, text)
     if "--" in text:
         text, n = _FLAG.subn(_sub_flag, text)
         changes += _count_new(n, text)

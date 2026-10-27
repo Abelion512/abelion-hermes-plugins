@@ -232,3 +232,8 @@ def test_source_code_is_not_corrupted():
                  "if sudo_user == 'root':", "def f(token: Token) -> None:", "_PER_PASS = 1000, 500, 4",
                  "agent.api_key = effective_key", "client(api_key=token, base_url=u)"):
         assert masked(line) == line, line
+
+
+def test_nested_label_before_credential_is_not_swallowed():
+    for text in (f"out: password: {FAKE}", f"result: token = {FAKE}", f"line1 a: b: api_key={FAKE}"):
+        assert FAKE not in masked(text), text

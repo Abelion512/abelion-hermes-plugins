@@ -1,13 +1,17 @@
 # Applied by .github/workflows/labeler.yml (actions/labeler). Label = plugin folder.
 screen:
   - changed-files:
-      - any-glob-to-any-file: "screen/**"
+      - any-glob-to-any-file:
+          - "screen/**"
+          - "e2e/test_screen_*.py"
 shield:
   - changed-files:
       - any-glob-to-any-file: "shield_abelion/**"
 pii-mask:
   - changed-files:
-      - any-glob-to-any-file: "pii_mask_abelion/**"
+      - any-glob-to-any-file:
+          - "pii_mask_abelion/**"
+          - "e2e/test_privacy_*.py"
 output-redact:
   - changed-files:
       - any-glob-to-any-file: "output_redact_abelion/**"
@@ -19,7 +23,9 @@ rsi-learn:
       - any-glob-to-any-file: "rsi_learn_abelion/**"
 9router:
   - changed-files:
-      - any-glob-to-any-file: "model-providers/9router/**"
+      - any-glob-to-any-file:
+          - "model-providers/9router/**"
+          - "e2e/test_nine_router_*.py"
 worktree-guard:
   - changed-files:
       - any-glob-to-any-file: "worktree_guard_abelion/**"
@@ -35,3 +41,10 @@ dependencies:
 audit:
   - changed-files:
       - any-glob-to-any-file: "audits/**"
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*/docs/**"
+          - "README.md"
+          - "e2e/README.md"

@@ -5,7 +5,7 @@ requests are judged separately: a request without `tools` is auxiliary.
 Synthetic values only. A FAIL here is a real gap, not a skip.
 """
 import pytest
-from support.fake_provider import FakeProvider
+from support.loopback_provider import LoopbackProvider
 from support.host import make_profile, run_hermes, wire_text, requires_hermes
 
 pytestmark = requires_hermes
@@ -26,7 +26,7 @@ def leaked(req):
 
 
 def chat(tmp_path, prompt, replies=None, argv_extra=(), plugins=PLUGIN, extra_config="", cwd=None):
-    with FakeProvider(replies) as srv:
+    with LoopbackProvider(replies) as srv:
         home = make_profile(tmp_path, srv.base_url, plugins, extra_config)
         run_hermes(home, ["chat", "-q", prompt, *argv_extra], cwd=cwd)
         return srv

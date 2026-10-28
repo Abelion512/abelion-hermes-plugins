@@ -2,7 +2,7 @@
 import json, shutil, subprocess
 from pathlib import Path
 from support.host import PLUGINS, HERMES_PYTHON, hermetic_env, make_profile, run_hermes, requires_hermes
-from support.fake_provider import FakeProvider
+from support.loopback_provider import LoopbackProvider
 
 pytestmark = requires_hermes
 
@@ -22,7 +22,7 @@ def _registered(home):
 
 
 def test_installed_copy_native_remove_unregisters_but_disable_does_not(tmp_path):
-    with FakeProvider() as srv:
+    with LoopbackProvider() as srv:
         home = make_profile(tmp_path, srv.base_url)
         dst = home / ".hermes" / "plugins" / "model-providers"; dst.mkdir()
         shutil.copytree(PLUGINS / "model-providers" / "9router", dst / "9router")

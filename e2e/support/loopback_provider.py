@@ -1,9 +1,9 @@
-"""Loopback OpenAI-compatible provider that records every request. No network, no real keys."""
+"""Synthetic loopback OpenAI-compatible test provider that records every request. No network, no real keys."""
 import json, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-class FakeProvider:
+class LoopbackProvider:
     def __init__(self, replies=None):
         self.requests, self._replies, self._lock = [], list(replies or []), threading.Lock()
         outer = self
@@ -15,7 +15,7 @@ class FakeProvider:
                 self.send_response(code); self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
             def do_GET(self):
-                self._send(200, {"object": "list", "data": [{"id": "fake-model", "object": "model"}]})
+                self._send(200, {"object": "list", "data": [{"id": "e2e-test-model", "object": "model"}]})
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
                 with outer._lock:
@@ -35,7 +35,7 @@ class FakeProvider:
                     self._send(200, out.encode(), "text/event-stream")
                 else:
                     fin = "stop" if isinstance(reply, str) else "tool_calls"
-                    self._send(200, {"id": "x", "object": "chat.completion", "model": "fake-model",
+                    self._send(200, {"id": "x", "object": "chat.completion", "model": "e2e-test-model",
                                      "choices": [{"index": 0, "message": msg, "finish_reason": fin}],
                                      "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
         self._srv = ThreadingHTTPServer(("127.0.0.1", 0), H)

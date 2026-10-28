@@ -35,11 +35,11 @@ def make_profile(tmp: Path, base_url: str, plugins=(), extra_config=""):
     home = tmp / "home"; h = home / ".hermes"; h.mkdir(parents=True)
     enabled = "".join(f"    - {pid}\n" for pid, _ in plugins)
     (h / "config.yaml").write_text(
-        f"model:\n  provider: custom\n  base_url: {base_url}\n  default: fake-model\n  context_length: 128000\n"
+        f"model:\n  provider: custom\n  base_url: {base_url}\n  default: e2e-test-model\n  context_length: 128000\n"
         "agent:\n  api_max_retries: 1\nupdates:\n  check: false\ncompression:\n  enabled: false\n"
         f"telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n    offer_version: {OFFER}\n"
         + (f"plugins:\n  enabled:\n{enabled}" if plugins else "") + extra_config)
-    (h / ".env").write_text("OPENAI_API_KEY=sk-fake-loopback-not-real\n")
+    (h / ".env").write_text("OPENAI_API_KEY=e2e-loopback-test-placeholder\n")
     (h / "plugins").mkdir()
     for pid, folder in plugins:
         shutil.copytree(PLUGINS / folder, h / "plugins" / pid, ignore=shutil.ignore_patterns("tests", "__pycache__"))

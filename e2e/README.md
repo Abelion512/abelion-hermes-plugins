@@ -23,7 +23,7 @@ The plugin must not be described as providing mandatory privacy on an unsupporte
 | 9Router Catalog lifecycle (disabled from repo install) | `model-providers/9router/README.md` | `test_nine_router_disabled.py` |
 | Bot Screen dashboard and human/agent input lease | `screen/docs/USAGE.md` | `test_screen_dashboard.py` |
 
-`support/fake_provider.py` is an OpenAI-compatible loopback server that records every request;
+`support/loopback_provider.py` is an OpenAI-compatible loopback server that records every request;
 `support/host.py` creates an isolated Hermes profile; `support/screen_driver.js` drives real Chrome.
 No external provider is called. Real API credentials are stripped from the subprocess environment.
 
@@ -47,7 +47,7 @@ converts a missing prerequisite into a failure.
 ## Safety and coverage limits
 
 - Synthetic canaries only, temporary profile, loopback-only model endpoint, no real keys.
-- Privacy tests verify the exact request bodies observed by the fake provider. This is not proof that every
+- Privacy tests verify the exact request bodies observed by the loopback test provider. This is not proof that every
   possible secret format is detectable or that every Hermes transport is intercepted.
 - Required-mode behavior is tested only against the pinned core contract. A stock/unsupported host is not
   certified by this run.

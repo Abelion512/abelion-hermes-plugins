@@ -1,0 +1,21 @@
+{
+  "repository": "Abelion512/abelion-hermes-plugins",
+  "requested_commit_sha": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "commit_message": "test: exempt exact synthetic classifier canary fingerprint",
+  "parent_sha": "579e8c4f52e8bdcf26e1cadc5798cb755071fd90",
+  "root_tree_sha": "cb7a95c4d2f64717e3a2a3e6b6d332ed1213f04d",
+  "hash_note": "The following are Git blob SHA-1 identifiers from the exact pinned remote tree, not locally measured SHA-256 values.",
+  "local_git_head_verified": false,
+  "source_files_read_via_github_api": {
+    "pii_mask_abelion/README.md": "e51c8c234d2386d2e68c0df3c48883a4e0672992",
+    "pii_mask_abelion/__init__.py": "18813ab4e235d2afb3d577ec01b47a49ffc98b29",
+    "pii_mask_abelion/_credentials.py": "342632a3ddba65669cbeabdc45bd75fcaf1135db",
+    "pii_mask_abelion/_patterns.py": "ba8e5c86cc48f0a693a3b444fba2ef7368b2266a",
+    "pii_mask_abelion/guard.py": "5dfd3b602f7a4627156f38785650036aea1116c9",
+    "pii_mask_abelion/pii_middleware.py": "cc3be4fbd4d96d7edfd106dd7ef2b2a9afec3e15",
+    "pii_mask_abelion/output_redact.py": "e4817d66f27f50c47dc8797859592a638f8665f5",
+    "pii_mask_abelion/tests/test_classifier_case_invariance.py": "07b46bf216c7f76afca7051df05d3d676e5018e1"
+  },
+  "local_source_hash_verification": "NOT RUN because no local checkout was created",
+  "source_unchanged": "No local plugin source existed to mutate; local checkout comparison is NOT RUN"
+}

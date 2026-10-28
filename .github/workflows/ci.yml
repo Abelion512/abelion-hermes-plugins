@@ -194,7 +194,8 @@ jobs:
           test -x "$SCREEN_E2E_CHROME"
           node -e "require('puppeteer-core')"
       - name: Run all real-host end-to-end tests
-        run: "$HERMES_PYTHON" -m pytest e2e -q -rs
+        run: |
+          "$HERMES_PYTHON" -m pytest e2e -q -rs
 
   secret-scan:
     runs-on: ubuntu-latest

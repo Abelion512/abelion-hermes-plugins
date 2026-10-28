@@ -1,4 +1,4 @@
-"""In-process mock of the pinned Hermes display.* RPC contract (bf0203a),
+"""In-process test fixture implementing the pinned Hermes display.* RPC contract (bf0203a),
 plus an echo /api/display/ws that records how each connection ended.
 
 RPC semantics mirrored from the real gateway (tui_gateway/methods_display.py,

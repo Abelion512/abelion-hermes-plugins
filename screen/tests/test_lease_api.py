@@ -7,6 +7,8 @@ Covers the two bugs fixed in v0.2/v0.3:
 Plus the happy path and the multiviewer/foreign-holder matrix.
 """
 import httpx
+import pytest
+from types import SimpleNamespace
 
 
 def _observe(srv):
@@ -137,3 +139,38 @@ def test_viewer_identity_stable_across_reload(plugin):
     j2 = _observe(plugin)  # reload
     assert j2["viewer_id"] == j1["viewer_id"]
     assert j2["we_hold"] is True
+
+
+def _request_for_port(port=9119):
+    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(bound_port=port)))
+
+
+def test_upstream_override_is_ignored_outside_explicit_test_mode(monkeypatch):
+    import plugin_api
+    monkeypatch.setenv("HERMES_SCREEN_UPSTREAM", "ws://127.0.0.1:12345")
+    monkeypatch.delenv("HERMES_SCREEN_TEST_MODE", raising=False)
+    assert plugin_api._upstream_base(_request_for_port()) == "ws://127.0.0.1:9119"
+
+
+def test_test_upstream_override_rejects_non_loopback_target(monkeypatch):
+    import plugin_api
+    monkeypatch.setenv("HERMES_SCREEN_TEST_MODE", "1")
+    monkeypatch.setenv("HERMES_SCREEN_UPSTREAM", "ws://203.0.113.10:12345")
+    with pytest.raises(plugin_api.UpstreamError):
+        plugin_api._upstream_base(_request_for_port())
+
+
+def test_missing_canonical_websocket_auth_denies_upgrade(monkeypatch):
+    import hermes_cli.web_server_chat as chat
+    import plugin_api
+    monkeypatch.delattr(chat, "_ws_auth_ok")
+    assert plugin_api._ws_upgrade_authorized(object()) is False
+
+
+def test_canonical_websocket_auth_exception_denies_upgrade(monkeypatch):
+    import hermes_cli.web_server_chat as chat
+    import plugin_api
+    def broken(_ws):
+        raise RuntimeError("test-only auth failure")
+    monkeypatch.setattr(chat, "_ws_auth_ok", broken)
+    assert plugin_api._ws_upgrade_authorized(object()) is False

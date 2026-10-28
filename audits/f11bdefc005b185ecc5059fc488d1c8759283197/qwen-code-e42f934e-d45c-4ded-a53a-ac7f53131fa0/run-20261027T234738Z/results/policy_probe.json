@@ -1,0 +1,45 @@
+{
+  "F1_paren_swallow": [
+    "[REDACTED]_PAREN_CRED",
+    1
+  ],
+  "F2_double_mask": [
+    "[REDACTED]_[REDACTED]_BARE_SECRET",
+    2
+  ],
+  "F3_partial_value": [
+    "password=P@ssw0rd!xyz",
+    0
+  ],
+  "F4_nontext_passthrough": null,
+  "F5_address_residue": [
+    "[REDACTED]_PII_FIELD. Merdeka No 5 Jakarta",
+    1
+  ],
+  "F6_20digit": [
+    [
+      "id 12345678901234567890 end",
+      0
+    ],
+    "PUBLIC"
+  ],
+  "F7_short_env": [
+    [
+      "my_api_key=short",
+      0
+    ],
+    "PUBLIC"
+  ],
+  "F8_output_label_kept": "*** (username) *** (password)",
+  "F9_camel_split": [
+    "user[REDACTED]_SECRET_CRED",
+    1
+  ],
+  "F10_bare_nocontext": [
+    "PUBLIC",
+    [
+      "Xk9mP2wQ7rT4yZ8nB5vC1dF6gH3j",
+      0
+    ]
+  ]
+}

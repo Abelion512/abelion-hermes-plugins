@@ -1,0 +1,81 @@
+{
+  "seed": 20261028,
+  "target_sha_requested": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "tested_sha_actual": "f11bdefc005b185ecc5059fc488d1c8759283197",
+  "duration_s": 281.32,
+  "total_executions": 1000000,
+  "total_assertions": 2180000,
+  "total_failed_cases": 0,
+  "global_unique_inputs": 675027,
+  "categories": {
+    "classify": {
+      "planned": 200000,
+      "executed": 200000,
+      "assertions": 600000,
+      "passed_asserts": 600000,
+      "failed_cases": 0,
+      "unique_inputs": 162436
+    },
+    "fp_names": {
+      "planned": 150000,
+      "executed": 150000,
+      "assertions": 300000,
+      "passed_asserts": 300000,
+      "failed_cases": 0,
+      "unique_inputs": 47958
+    },
+    "mask_text": {
+      "planned": 200000,
+      "executed": 200000,
+      "assertions": 600000,
+      "passed_asserts": 600000,
+      "failed_cases": 0,
+      "unique_inputs": 187552
+    },
+    "request_nested": {
+      "planned": 150000,
+      "executed": 150000,
+      "assertions": 150000,
+      "passed_asserts": 150000,
+      "failed_cases": 0,
+      "unique_inputs": 149987
+    },
+    "boundary": {
+      "planned": 100000,
+      "executed": 100000,
+      "assertions": 300000,
+      "passed_asserts": 300000,
+      "failed_cases": 0,
+      "unique_inputs": 59176
+    },
+    "corrupt": {
+      "planned": 20000,
+      "executed": 20000,
+      "assertions": 20000,
+      "passed_asserts": 20000,
+      "failed_cases": 0,
+      "unique_inputs": 19
+    },
+    "output_redact": {
+      "planned": 150000,
+      "executed": 150000,
+      "assertions": 150000,
+      "passed_asserts": 150000,
+      "failed_cases": 0,
+      "unique_inputs": 67889
+    },
+    "regression": {
+      "planned": 30000,
+      "executed": 30000,
+      "assertions": 60000,
+      "passed_asserts": 60000,
+      "failed_cases": 0,
+      "unique_inputs": 13
+    }
+  },
+  "residue_probe": {
+    "checked": 324469,
+    "residue": 43993
+  },
+  "failures_sample": []
+}

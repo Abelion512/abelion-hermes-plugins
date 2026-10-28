@@ -1,6 +1,2 @@
-__pycache__/
-*.pyc
-*.pyo
-.DS_Store
-*.swp
-*.swo
+*.log
+results/*.json

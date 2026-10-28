@@ -178,8 +178,14 @@ jobs:
           # Dashboard's --skip-build mode requires the matching, fresh web_dist in Hermes core.
           (cd hermes-core && npm install --workspace web && npm run build -w web)
           npm install --no-save puppeteer@24.31.0
+          # npm 11 may leave a partial Puppeteer cache when install scripts are blocked.
+          # Isolate the cache, install Chrome explicitly, and fail unless the binary exists.
+          export PUPPETEER_CACHE_DIR="$RUNNER_TEMP/puppeteer-cache"
+          rm -rf "$PUPPETEER_CACHE_DIR"
           npx puppeteer browsers install chrome
           chrome="$(node -e "console.log(require('puppeteer').executablePath())")"
+          test -x "$chrome"
+          echo "PUPPETEER_CACHE_DIR=$PUPPETEER_CACHE_DIR" >> "$GITHUB_ENV"
           echo "SCREEN_E2E_CHROME=$chrome" >> "$GITHUB_ENV"
       - name: Verify exact host revision and Screen prerequisites
         run: |

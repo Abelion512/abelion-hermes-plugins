@@ -1,0 +1,26 @@
+Privacy Guard 1M-Execution Audit — Sanitized Log
+=======================================================
+Target SHA: 06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c
+Seed: 0x4865726d6573 (79600548668787)
+Duration: 137.42s
+Native agent.redact available: False
+
+Domain Results:
+  classification:
+    planned=200000 executed=200000 pass=200000 fail=0 skip=0 not_run=0 assertions=200000 unique=260000
+  false_positive:
+    planned=200000 executed=200000 pass=200000 fail=0 skip=0 not_run=0 assertions=200000 unique=0
+  masking:
+    planned=200000 executed=200000 pass=200000 fail=0 skip=0 not_run=0 assertions=200000 unique=0
+  session:
+    planned=200000 executed=200000 pass=200000 fail=0 skip=0 not_run=0 assertions=200000 unique=0
+  redaction:
+    planned=200000 executed=200000 pass=200000 fail=0 skip=0 not_run=0 assertions=200000 unique=0
+
+Totals:
+  planned=1000000 executed=1000000
+  pass=1000000 fail=0 skip=0
+  not_run=0 assertions=1000000
+  unique_inputs_estimated=260000
+
+Exit code: 0 (clean completion)

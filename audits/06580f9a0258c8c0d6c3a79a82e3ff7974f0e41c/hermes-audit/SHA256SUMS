@@ -1,0 +1,20 @@
+# Source file hashes at pinned SHA 06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c
+# Generated via: sha256sum
+
+# Source files (unchanged audit target — verified via git diff HEAD = clean)
+75c8d35b007d66dd1a53c41fb8a35f6784a0cb20a7d234fa6949a7da2e93b2fa  pii_mask_abelion/guard.py
+c14eb89279e0328fc642bf3eb986564f16d8bd8f602a71d3e2068be104977279  pii_mask_abelion/_credentials.py
+c2d53776f27a6f262f6b33e9e04aaca69b67ad2d8fbf487bf685d05562ecbbae  pii_mask_abelion/pii_middleware.py
+bc10be4f9bbc5e8bfafbb82db5a5d97d30c5607293cc683ee0fb55f432a7c601  pii_mask_abelion/output_redact.py
+d107da26c30f9c96760037375ccc68202fcaf94c426bd41176dfbcb1ebf62816  pii_mask_abelion/_patterns.py
+
+# Runner and audit artifacts (evidence)
+c15d0f4c8f73a1906127501aa105305126642dd7f7dcfe3373b4666f03a7d762  hermes-audit/runner/audit_runner.py
+9041b4cf9577d42656e635f3cdd9fdebdcbf57a32a52a413d8328d535858db7c  hermes-audit/REPORT.md
+410d23d0746a7eb69338d21a855dca5158e7f3a99f69ab9f1b56e5a4debec4fd  hermes-audit/results.json
+4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945  hermes-audit/failures_full.json
+8df09ad3cca53ed311f9f323275325cd267367d6e28fc89f04f5988681a51ec7  hermes-audit/repros/finding001_repro.py
+5d51f6f42990f910ddebc6c4b87397bc15274c9d2207fbc13ea505a28376886b  hermes-audit/sanitized/runner_log.txt
+
+# Test environment
+# Python 3.12.3, no native agent.redact/agent.privacy_guard (ImportError path exercised)

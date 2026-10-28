@@ -1,0 +1,51 @@
+.....s..ss.......F.....F........................F....................... [ 98%]
+.                                                                        [100%]
+=================================== FAILURES ===================================
+_________________ test_performance_stays_linear_on_plain_text __________________
+
+    def test_performance_stays_linear_on_plain_text():
+        msg = {"role": "user", "content": ("def foo(x):\n    y = x + 1  # paths /home/u/p/file.py a=b\n" * 40)}
+        req = {"model": "m", "messages": [dict(msg) for _ in range(100)]}  # ~300 KB
+        t = time.perf_counter()
+        for _ in range(3):
+            assert pii.pii_middleware(req) is None
+        per_call = (time.perf_counter() - t) / 3
+>       assert per_call < 1.0, per_call  # generous CI bound; local is far lower
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: 1.5445755776666676
+E       assert 1.5445755776666676 < 1.0
+
+pii_mask_abelion/tests/test_credentials.py:129: AssertionError
+___________________ test_pathological_inputs_do_not_blow_up ____________________
+
+    def test_pathological_inputs_do_not_blow_up():
+        cases = ["a" * 200000, "api_key=" + "x" * 200000, "-----BEGIN " + "PRIVATE KEY-----" + "y" * 200000,
+                 "k=" * 100000, ":" * 200000, ("token " * 50000), "%3D" * 100000, "_-." * 60000 + "=v" * 5]
+        for text in cases:
+            t = time.perf_counter()
+            masked(text)
+>           assert time.perf_counter() - t < 2.0, text[:20]
+E           AssertionError: api_key=xxxxxxxxxxxx
+E           assert (4814.370340296 - 4800.539353719) < 2.0
+E            +  where 4814.370340296 = <built-in function perf_counter>()
+E            +    where <built-in function perf_counter> = time.perf_counter
+
+pii_mask_abelion/tests/test_credentials.py:197: AssertionError
+______________________________ test_bounded_redos ______________________________
+
+    def test_bounded_redos():
+        import time
+        for text in ['a.'*20000+'@','a-'*20000+'@b','http://'*10000]:
+>           t=time.monotonic();Guard().request({'m':text},session_id='a');assert time.monotonic()-t<2
+                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: assert (4817.055437332 - 4814.839361653) < 2
+E            +  where 4817.055437332 = <built-in function monotonic>()
+E            +    where <built-in function monotonic> = <module 'time' (built-in)>.monotonic
+
+pii_mask_abelion/tests/test_guard.py:84: AssertionError
+=========================== short test summary info ============================
+FAILED pii_mask_abelion/tests/test_credentials.py::test_performance_stays_linear_on_plain_text
+FAILED pii_mask_abelion/tests/test_credentials.py::test_pathological_inputs_do_not_blow_up
+FAILED pii_mask_abelion/tests/test_guard.py::test_bounded_redos - AssertionEr...
+3 failed, 67 passed, 6 skipped in 78.80s (0:01:18)
+EXIT=1

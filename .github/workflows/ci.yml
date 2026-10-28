@@ -176,8 +176,7 @@ jobs:
           uv pip install --python "$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" pytest==9.1.1
           echo "HERMES_PYTHON=$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" >> "$GITHUB_ENV"
           # Dashboard's --skip-build mode requires the matching, fresh web_dist in Hermes core.
-          npm install --workspace web
-          npm run build -w web
+          (cd hermes-core && npm install --workspace web && npm run build -w web)
           npm install --no-save puppeteer@24.31.0
           npx puppeteer browsers install chrome
           chrome="$(node -e "console.log(require('puppeteer').executablePath())")"

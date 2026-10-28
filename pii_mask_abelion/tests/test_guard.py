@@ -213,7 +213,7 @@ def test_ordinary_session_ids_and_schema_examples_not_material():
 def test_labeled_value_repeated_later_in_same_message_is_masked():
     guard = Guard()
     value = "private_user_canary_7mQ2"
-    raw = f"username: {value}\\nlogin as {value}"
+    raw = f"username: {value}\nlogin as {value}"
     result = guard.request({"messages": [{"role": "user", "content": raw}]}, session_id="repeat")
     wire = json.dumps(result["request"], ensure_ascii=False)
     assert value not in wire

@@ -14,7 +14,7 @@ def test_exactly_three_independent_manifests_and_catalog_entries():
     manifests=list(ROOT.rglob('plugin.yaml'))
     assert len(manifests)==3
     catalog=json.loads((ROOT/'hermes.json').read_text())['plugins']
-    assert len(catalog)==3
+    assert len(catalog)==2  # 9router code kept but disabled (not in catalog)
     assert 'output-redact-abelion' not in {p['id'] for p in catalog}
     assert 'pii-mask-abelion' in {p['id'] for p in catalog}
     assert not (ROOT/'output_redact_abelion').exists()

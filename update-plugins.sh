@@ -21,9 +21,8 @@ for d in pii_mask_abelion screen; do
   echo "  ✅ $d"
 done
 
-mkdir -p "$PLUGIN_DIR/model-providers"
-rsync -a --delete model-providers/9router/ "$PLUGIN_DIR/model-providers/9router/"
-echo "  ✅ model-providers/9router"
+# 9Router Catalog is disabled: not synced. Code stays in model-providers/9router.
+# An already installed copy is left untouched; remove it yourself if wanted.
 
 echo ""
 echo "✅ Plugins updated. Restart gateway:"

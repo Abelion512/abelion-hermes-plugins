@@ -6,7 +6,7 @@ Three focused packages for Hermes Agent. This is a local review candidate, not a
 |---|---|---|---|
 | Privacy Guard | `pii-mask-abelion` | `pii_mask_abelion` | Session masking and held native output redaction |
 | Bot Screen | `screen` | `screen` | Dashboard virtual-desktop view and input takeover |
-| 9Router Catalog | `9router` | `model-providers/9router` | Model catalog and picker adapter for an existing 9Router service |
+| 9Router Catalog (disabled) | `9router` | `model-providers/9router` | Disabled: not listed in hermes.json and not installed by update-plugins.sh. Code kept; the 9Router service is unaffected |
 
 Names clarify scope; runtime IDs and skill namespaces stay stable. 9Router Catalog does not implement the router. Bot Screen does not show the user's personal display or pause other tools during takeover.
 

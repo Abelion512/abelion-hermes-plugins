@@ -1,6 +1,6 @@
 {
   "name": "abelion-hermes-plugins",
-  "description": "Privacy Guard, Bot Screen and 9Router Catalog for Hermes Agent",
+  "description": "Privacy Guard and Bot Screen for Hermes Agent (9Router Catalog disabled, code kept)",
   "version": "1.0.0",
   "author": "Abelion",
   "plugins": [
@@ -8,11 +8,6 @@
       "id": "pii-mask-abelion",
       "path": "pii_mask_abelion",
       "description": "Privacy Guard: session-bound request/tool masking and held output redaction"
-    },
-    {
-      "id": "9router",
-      "path": "model-providers/9router",
-      "description": "9Router Catalog: validated model discovery; offline curated aliases are unverified"
     },
     {
       "id": "screen",

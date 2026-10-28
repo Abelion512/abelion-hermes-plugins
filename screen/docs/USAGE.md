@@ -43,3 +43,22 @@ harness) and fullscreen CSS: `screen/tests/`.
 ## Configuration
 
 None beyond dashboard auth (shared with the whole dashboard).
+
+## Status: desired, implemented, proven
+
+Draft for review. Proof means [`e2e/test_screen_dashboard.py`](../../e2e/test_screen_dashboard.py) with a real dashboard, real Bot Desktop and real Chrome (requirements in [`e2e/README.md`](../../e2e/README.md)).
+
+| Behavior | Proven by E2E |
+|---|---|
+| Connect shows the live desktop under the agent lease | Yes |
+| Typing is ignored while the agent holds the lease (view-only) | Yes |
+| Take over gives the human lease and typing works | Yes |
+| Reconnect keeps the human lease | Yes |
+| Hand back returns to view-only | Yes |
+| No page errors in that flow | Yes |
+| Agent-side `computer_use` while the human holds the lease is refused | Component-level only, not in the E2E |
+| Model-driven `computer_use`, phone/Tailscale, abrupt tab close | Not covered (UNRUN) |
+
+The last Screen E2E run used a lowered free-memory guard (`SCREEN_E2E_MIN_FREE_MB=400`) because the test host had too little memory for the default.
+
+Build or change this feature: edit the code, update this table, and change or add the matching test in the same commit.

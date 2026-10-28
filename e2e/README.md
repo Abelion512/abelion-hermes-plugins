@@ -32,6 +32,11 @@ A missing requirement is reported as skipped with `NOT RUN: <what is missing>`. 
 Providers are loopback fakes, keys are fake, the profile is a temp directory and the environment is stripped of
 real keys and tokens. Private values in the tests are synthetic.
 
+## 9router adapter (disabled)
+
+Desired: not listed in `hermes.json`, not installed by `update-plugins.sh`; code kept; the user's 9Router service is untouched.
+Proven by `test_nine_router_disabled.py`. On Hermes, `plugins disable` on an installed copy leaves it registered; only `plugins remove` unregisters it.
+
 ## Known results (Hermes upstream main 8acb7f65, repo head 6fd0584 plus the 9router commit)
 
 - `test_auxiliary_requests_have_no_original_private_values` FAILS: the session-title request carries the originals.

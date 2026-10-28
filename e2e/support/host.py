@@ -3,7 +3,7 @@
 Requirements (tests are skipped, i.e. NOT RUN, when missing):
   HERMES_PYTHON  interpreter of a Hermes install (default: current interpreter, must import hermes_cli)
 """
-import json, os, shutil, subprocess, sys
+import json, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 import pytest
 
@@ -11,8 +11,23 @@ PLUGINS = Path(__file__).resolve().parents[2]
 HERMES_PYTHON = os.environ.get("HERMES_PYTHON", sys.executable)
 
 
+_SAFE_ENV_KEYS = (
+    "PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "TEMP",
+    "NODE_PATH", "PUPPETEER_CACHE_DIR", "SCREEN_E2E_CHROME",
+)
+
+
+def _safe_base_env():
+    """Allow only execution/runtime settings needed by disposable E2E processes."""
+    return {key: os.environ[key] for key in _SAFE_ENV_KEYS if key in os.environ}
+
+
 def _probe(code):
-    r = subprocess.run([HERMES_PYTHON, "-c", code], capture_output=True, text=True)
+    env = _safe_base_env()
+    env["HOME"] = os.environ.get("RUNNER_TEMP", tempfile.gettempdir())
+    r = subprocess.run(
+        [HERMES_PYTHON, "-c", code], env=env, capture_output=True, text=True,
+    )
     return r.stdout.strip() if r.returncode == 0 else None
 
 
@@ -22,11 +37,25 @@ requires_hermes = pytest.mark.skipif(OFFER is None, reason="NOT RUN: no Hermes i
 
 
 def hermetic_env(home: Path, extra=None):
-    env = {k: v for k, v in os.environ.items() if not (k.endswith(("_API_KEY", "_TOKEN", "_SECRET", "_PASSWORD"))
-           or k.startswith(("HERMES_", "OPENAI", "ANTHROPIC", "OPENROUTER", "GEMINI", "GOOGLE_")))}
-    env.update(HOME=str(home), HERMES_HOME=str(home / ".hermes"), NO_COLOR="1", TERM="dumb",
-               NO_PROXY="127.0.0.1,localhost", HERMES_ACCEPT_HOOKS="1", HERMES_STATE_DB_GUARD_BYPASS="1")
+    """Create an isolated process environment without inheriting host credentials."""
+    env = _safe_base_env()
+    env.update(
+        HOME=str(home),
+        HERMES_HOME=str(home / ".hermes"),
+        NO_COLOR="1",
+        TERM="dumb",
+        NO_PROXY="127.0.0.1,localhost",
+        HERMES_ACCEPT_HOOKS="1",
+        HERMES_STATE_DB_GUARD_BYPASS="1",
+    )
     env.update(extra or {})
+    return env
+
+
+def desktop_env(home: Path, display: str, xauthority: str):
+    """Minimal environment for test-controlled desktop/Chrome child processes."""
+    env = hermetic_env(home)
+    env.update(DISPLAY=display, XAUTHORITY=xauthority)
     return env
 
 

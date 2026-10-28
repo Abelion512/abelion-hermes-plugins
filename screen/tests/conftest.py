@@ -1,4 +1,4 @@
-"""Spin up the mock upstream (one per session, keeps lease state) and the
+"""Spin up the test upstream (one per session, keeps lease state) and the
 plugin FastAPI app (per test, restartable = a dashboard restart)."""
 import asyncio, os, socket, sys, threading, time, types
 
@@ -9,12 +9,12 @@ def _core_ws_auth_stub(monkeypatch):
     """hermes_cli is not installed in the test harness. Production now FAILS
     CLOSED when the core WS auth module is missing, so tests inject a stub
     that admits; the gate test replaces it with a denying one."""
-    fake_chat = types.ModuleType("hermes_cli.web_server_chat")
-    fake_chat._ws_auth_ok = lambda ws: True
-    fake_pkg = types.ModuleType("hermes_cli")
-    fake_pkg.web_server_chat = fake_chat
-    monkeypatch.setitem(sys.modules, "hermes_cli", fake_pkg)
-    monkeypatch.setitem(sys.modules, "hermes_cli.web_server_chat", fake_chat)
+    auth_stub = types.ModuleType("hermes_cli.web_server_chat")
+    auth_stub._ws_auth_ok = lambda ws: True
+    hermes_stub = types.ModuleType("hermes_cli")
+    hermes_stub.web_server_chat = auth_stub
+    monkeypatch.setitem(sys.modules, "hermes_cli", hermes_stub)
+    monkeypatch.setitem(sys.modules, "hermes_cli.web_server_chat", auth_stub)
 
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dashboard"))
@@ -74,12 +74,12 @@ class PluginServer:
 
     def restart(self):
         """Abrupt dashboard restart: drop the process WITHOUT closing the
-        upstream WS politely, so the mock keeps the orphaned human lease."""
+        upstream WS politely, so the test upstream keeps the orphaned human lease."""
         self.stop()
 
 
 @pytest.fixture(scope="session")
-def mock():
+def upstream():
     m = MockUpstream()
     port = _free_port()
     ready = threading.Event()
@@ -93,10 +93,10 @@ def mock():
 
 
 @pytest.fixture()
-def plugin(mock):
+def plugin(upstream):
     old_upstream = os.environ.get("HERMES_SCREEN_UPSTREAM")
     old_test_mode = os.environ.get("HERMES_SCREEN_TEST_MODE")
-    os.environ["HERMES_SCREEN_UPSTREAM"] = mock.base_ws
+    os.environ["HERMES_SCREEN_UPSTREAM"] = upstream.base_ws
     os.environ["HERMES_SCREEN_TEST_MODE"] = "1"
     srv = None
     try:
@@ -107,7 +107,7 @@ def plugin(mock):
         plugin_api._rpc_base = None
         plugin_api._ticket = None
         plugin_api._viewer_id = None
-        srv = PluginServer(mock.port)
+        srv = PluginServer(upstream.port)
         srv.start()
         srv.base_http = f"http://127.0.0.1:{srv.port}"
         yield srv

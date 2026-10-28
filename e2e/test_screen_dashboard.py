@@ -9,7 +9,7 @@ Not covered: model-driven computer_use, phone/Tailscale, abrupt tab close, a use
 import json, os, shutil, signal, socket, subprocess, sys, time, urllib.request
 from pathlib import Path
 import pytest
-from support.host import HERMES_PYTHON, OFFER, PLUGINS, hermetic_env
+from support.host import HERMES_PYTHON, OFFER, PLUGINS, desktop_env, hermetic_env
 
 CHROME = os.environ.get("SCREEN_E2E_CHROME") or shutil.which("google-chrome") or ""
 NODE = shutil.which("node")
@@ -64,16 +64,23 @@ def flow(tmp_path_factory):
             tail = dashboard_log.read_text(encoding="utf-8", errors="replace")[-5000:]
             pytest.fail(f"dashboard exited before becoming ready (exit={dash.returncode}); log:\\n{tail}")
         bd = h / "bot-desktop"
-        def run(): # desktop state is created on Connect; driver reads display lazily
-            return subprocess.run([NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen", CHROME, str(tmp / "mk_"),
-                                   str(bd / "Xauthority"), ":" + ((bd / "display").read_text().strip() if (bd / "display").exists() else "20")],
-                                  capture_output=True, text=True, timeout=120, env={**os.environ})
+        def run():  # desktop state is created on Connect; driver reads display lazily
+            display = ":" + ((bd / "display").read_text().strip() if (bd / "display").exists() else "20")
+            return subprocess.run(
+                [NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen", CHROME, str(tmp / "mk_"),
+                 str(bd / "Xauthority"), display],
+                capture_output=True, text=True, timeout=120,
+                env=desktop_env(home, display, str(bd / "Xauthority")),
+            )
         st = subprocess.run([HERMES_PYTHON, "-c", "from tools.bot_desktop import runtime as r; print(r.start(wait_seconds=60))"],
                             env=env, capture_output=True, text=True, timeout=120)
         if st.returncode: pytest.fail("desktop did not start: " + st.stderr[-300:])
         disp = ":" + (bd / "display").read_text().strip()
-        term = subprocess.Popen(["xfce4-terminal"], env={**os.environ, "DISPLAY": disp, "XAUTHORITY": str(bd / "Xauthority")},
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        term = subprocess.Popen(
+            ["xfce4-terminal"],
+            env=desktop_env(home, disp, str(bd / "Xauthority")),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+        )
         time.sleep(4)
         r = run()
         yield json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"error": r.stderr[-300:]}

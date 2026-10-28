@@ -25,116 +25,7 @@ LABEL = "9Router"
 DESCRIPTION = "9Router multi-model gateway (localhost:20128)"
 BASE_URL = "http://localhost:20128/v1"
 
-# Static curated list. Fallback saat /v1/models unreachable.
-# Includes oc/* and mmf/* — models that 9Router routes even though
-# they don't appear in /v1/models listing. Add more variants here
-# if 9Router gains new route prefixes.
-_CURATED: list[str] = [
-    # ── oc/* — OpenCode variants routed via 9Router ────────
-    "oc/nemotron-3-ultra-free",
-    "oc/deepseek-v4-flash",
-    "oc/deepseek-v4-flash-free",
-    "oc/deepseek-v4-pro",
-    "oc/claude-sonnet-5",
-    "oc/claude-haiku-4.5",
-    "oc/gemini-3.1-flash-lite",
-    "oc/gpt-5.4-mini",
-    "oc/mimo-v2.5-free",
-
-    # ── mmf/* — MMF variants routed via 9Router ────────────
-    "mmf/qwen3-32b",
-    "mmf/glm-5.2",
-    "mmf/minimax-m3",
-    "mmf/kimi-k2.6",
-    "mmf/nemotron-3-ultra",
-    "mmf/deepseek-v4-flash",
-    "mmf/mimo-auto",
-
-    # ── ag/ — Anthropic/Gemini via 9Router ─────────────────
-    "ag/claude-opus-4-6-thinking",
-    "ag/claude-sonnet-4-6",
-    "ag/gemini-3.1-pro-low",
-    "ag/gemini-3.5-flash-extra-low",
-    "ag/gemini-3.5-flash-low",
-    "ag/gemini-3-flash",
-    "ag/gemini-3-flash-agent",
-    "ag/gemini-pro-agent",
-    "ag/gpt-oss-120b-medium",
-    "cl/anthropic/claude-opus-4.6",
-    "cl/anthropic/claude-opus-4.7",
-    "cl/anthropic/claude-sonnet-4.6",
-    "cl/google/gemini-3.1-flash-lite-preview",
-    "cl/google/gemini-3.1-pro-preview",
-    "cl/kwaipilot/kat-coder-pro",
-    "cl/openai/gpt-5.3-codex",
-    "cl/openai/gpt-5.4",
-    "cx/gpt-5.3-codex",
-    "cx/gpt-5.3-codex-high",
-    "cx/gpt-5.3-codex-high-review",
-    "cx/gpt-5.3-codex-low",
-    "cx/gpt-5.3-codex-low-review",
-    "cx/gpt-5.3-codex-none",
-    "cx/gpt-5.3-codex-none-review",
-    "cx/gpt-5.3-codex-review",
-    "cx/gpt-5.3-codex-spark",
-    "cx/gpt-5.3-codex-spark-review",
-    "cx/gpt-5.3-codex-xhigh",
-    "cx/gpt-5.3-codex-xhigh-review",
-    "cx/gpt-5.4",
-    "cx/gpt-5.4-mini",
-    "cx/gpt-5.4-mini-review",
-    "cx/gpt-5.4-review",
-    "cx/gpt-5.5",
-    "cx/gpt-5.5-review",
-    "gc/gemini-2.5-flash",
-    "gc/gemini-2.5-flash-lite",
-    "gc/gemini-2.5-pro",
-    "gc/gemini-3.1-flash-lite",
-    "gc/gemini-3.1-flash-lite-preview",
-    "gemini/gemini-3.1-flash-lite-preview",
-    "gemini/gemini-3.1-pro-preview",
-    "gemini/gemini-3-flash-preview",
-    "gemini/gemma-4-31b-it",
-    "groq/llama-3.3-70b-versatile",
-    "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
-    "groq/openai/gpt-oss-120b",
-    "groq/qwen/qwen3-32b",
-    "kc/nvidia/nemotron-3-super-120b-a12b:free",
-    "kc/openrouter/free",
-    "kr/claude-haiku-4.5",
-    "kr/claude-sonnet-4.5",
-    "kr/claude-sonnet-4.5-agentic",
-    "kr/claude-sonnet-4.5-thinking",
-    "kr/claude-sonnet-4.5-thinking-agentic",
-    "kr/claude-sonnet-5",
-    "kr/claude-sonnet-5-agentic",
-    "kr/claude-sonnet-5-thinking",
-    "kr/claude-sonnet-5-thinking-agentic",
-    "kr/deepseek-3.2",
-    "kr/glm-5",
-    "kr/MiniMax-M2.5",
-    "kr/qwen3-coder-next",
-    "nvidia/deepseek-ai/deepseek-v4-flash",
-    "nvidia/deepseek-ai/deepseek-v4-pro",
-    "nvidia/minimaxai/minimax-m2.7",
-    "nvidia/minimaxai/minimax-m3",
-    "nvidia/moonshotai/kimi-k2.6",
-    "nvidia/nemotron-3-ultra-550b-a55b",
-    "nvidia/z-ai/glm-5.2",
-    "ollama/minimax-m3",
-    "ollama/minimax-m3:cloud",
-    "ollama/nemotron-3-super:latest",
-    "ollama/nemotron-3-ultra:cloud",
-    "openrouter/cohere/north-mini-code:free",
-    "openrouter/google/gemma-4-26b-a4b-it:free",
-    "openrouter/google/gemma-4-31b-it:free",
-    "openrouter/nvidia/nemotron-3-nano-30b-a3b:free",
-    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
-    "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
-    "openrouter/openrouter/free",
-    "openrouter/poolside/laguna-m.1:free",
-    "openrouter/poolside/laguna-xs.2:free",
-]
+# Catalog is live-only. Do not publish an offline list of unverified model IDs.
 
 # Cache
 _discovered: list[str] | None = None
@@ -167,7 +58,7 @@ def _fetch_models(timeout: float = 5.0) -> list[str] | None:
 
 
 def get_available_models() -> list[str]:
-    """Use the validated live catalog; offline curated entries are unverified fallback."""
+    """Return only validated IDs from the live gateway; no synthetic fallback inventory."""
     global _discovered, _discovered_at
     now = time.monotonic()
     if _discovered is None or now - _discovered_at >= _CACHE_SECONDS:
@@ -175,8 +66,8 @@ def get_available_models() -> list[str]:
         if live is not None:
             _discovered = live
         else:
-            logger.warning("[9router] Live catalog unavailable; curated fallback is unverified")
-            _discovered = list(_CURATED)
+            logger.warning("[9router] Live catalog unavailable; exposing no model IDs")
+            _discovered = []
         _discovered_at = now
     return list(_discovered)
 

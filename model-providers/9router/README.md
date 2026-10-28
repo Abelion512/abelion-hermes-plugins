@@ -2,9 +2,7 @@
 
 Registers the local [9Router](http://localhost:20128) gateway as a Hermes
 model provider. Its models appear in the `/model` picker under the 9Router
-provider - from validated gateway `/v1/models` IDs, including configured combos. No wildcard
-model IDs are invented. An unavailable catalog uses an explicitly unverified
-curated fallback, not a claim of current availability.
+provider - from validated gateway `/v1/models` IDs, including configured combos. No model IDs are invented. If the gateway is unavailable, the catalog stays empty rather than publishing unverified names.
 
 ## Requirements
 
@@ -33,9 +31,7 @@ hermes plugins doctor model-providers/9router
   `base_url` in `plugin.yaml` metadata is informational only.
 - Discovery is cached for 60 seconds. The host provider picker may keep its own
   registered fallback snapshot until refreshed/restarted.
-- When the gateway is unreachable at load time, the picker falls back to the
-  built-in curated list, which can be stale: a listed model may not exist and
-  a new route may be missing. Check the live `/v1/models` when it matters.
+- When the gateway is unreachable at load time, no fallback IDs are advertised. Reconnect to 9Router and refresh/restart the provider picker to discover the live catalog.
 
 ## Disable / rollback
 

@@ -7,8 +7,7 @@ valid unique string IDs from the live `data` list. Combos are ordinary IDs.
 An empty live catalog stays empty. No invented wildcard IDs are added.
 
 Discovery refreshes after 60 seconds when called again. Hermes may separately
-cache the provider's registration snapshot until refresh/restart. If discovery
-fails, the old curated list is only an unverified fallback, not availability.
+cache the provider's registration snapshot until refresh/restart. If discovery fails, the provider exposes an empty list until a valid live catalog is available.
 The plugin does not manage gateway quotas, account rotation or native endpoint
 selection. Current 9Router separately supports `/v1/chat/completions` and
 `/v1/messages`; a shared `/v1` prefix does not make their schemas equivalent.

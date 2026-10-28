@@ -11,13 +11,13 @@ from support.host import make_profile, run_hermes, wire_text, requires_hermes
 pytestmark = requires_hermes
 PLUGIN = [("pii-mask-abelion", "pii_mask_abelion")]
 CRED = "sk-proj-SyntheticE2eCanary7Xk29QmZ41AbCdEf"  # synthetic canary, not a real key
-PRIVATE = {"username": "private_user_canary_7mQ2", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
-           "nik": "3175091201900001", "credential": CRED,
-           "home_path": "/home/abelion/Documents/rahasia.txt"}
+PRIVATE = {"username": "private_user_canary_7mQ2", "email": "test.person@example.test", "phone": "+62 800-0000-0000",
+           "nik": "9999999900012345", "credential": CRED,
+           "home_path": "/home/e2e-user/private-fixture.txt"}
 REQUIRED_CONFIG = "security:\n  require_privacy_guard: true\n  privacy_guard_plugin: pii-mask-abelion\n"
-PROMPT = ("username: private_user_canary_7mQ2\nlogin as private_user_canary_7mQ2\nemail: bob.santoso@example.com\nHP +62 812-3456-7890\n"
-          "NIK 3175091201900001\nOPENAI_API_KEY=" + CRED + "\n"
-          "file /home/abelion/Documents/rahasia.txt\nsay hi")
+PROMPT = ("username: private_user_canary_7mQ2\nlogin as private_user_canary_7mQ2\nemail: test.person@example.test\nHP +62 800-0000-0000\n"
+          "NIK 9999999900012345\nOPENAI_API_KEY=" + CRED + "\n"
+          "file /home/e2e-user/private-fixture.txt\nsay hi")
 
 
 def leaked(req):
@@ -64,7 +64,7 @@ def test_tool_result_replay_masks_secrets(tmp_path):
 
 
 def test_benign_public_text_is_unchanged(tmp_path):
-    text = "what is github.com/Abelion512/abelion-hermes-plugins and who is Abelion"
+    text = "what is github.com/example-org/example-project and who is Example Maintainer"
     srv = chat(tmp_path, text)
     assert text in wire_text(srv.main_requests()[0]).replace("\\n", "\n")
 

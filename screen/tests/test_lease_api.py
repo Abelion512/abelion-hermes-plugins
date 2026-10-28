@@ -98,7 +98,7 @@ def test_foreign_live_holder_not_released_by_plain_hand_back(plugin, upstream):
 
     async def foreign_acquire():
         async with aiohttp.ClientSession() as s:
-            async with s.ws_connect(f"{upstream.base_ws}/api/ws?token=tok-upstream") as ws:
+            async with s.ws_connect(f"{upstream.base_ws}/api/ws?token=e2e-test-session-token") as ws:
                 async def rpc(rid, method, params):
                     await ws.send_str(_json.dumps(
                         {"jsonrpc": "2.0", "id": rid, "method": method, "params": params}))

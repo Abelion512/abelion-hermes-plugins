@@ -31,7 +31,7 @@ class LoopbackProvider:
                     ev = [{"choices": [{"index": 0, "delta": {"role": "assistant", **d}}]},
                           {"choices": [{"index": 0, "delta": {}, "finish_reason": fin}],
                            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}]
-                    out = "".join(f"data: {json.dumps({'id': 'x', 'object': 'chat.completion.chunk', 'model': 'fake-model', **e})}\n\n" for e in ev) + "data: [DONE]\n\n"
+                    out = "".join(f"data: {json.dumps({'id': 'x', 'object': 'chat.completion.chunk', 'model': 'e2e-test-model', **e})}\n\n" for e in ev) + "data: [DONE]\n\n"
                     self._send(200, out.encode(), "text/event-stream")
                 else:
                     fin = "stop" if isinstance(reply, str) else "tool_calls"

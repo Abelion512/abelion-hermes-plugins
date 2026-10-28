@@ -16,7 +16,7 @@ Lease state lives in THIS object, so it survives a plugin-app restart
 import asyncio, hashlib, json, secrets, time
 from aiohttp import web
 
-TOKEN = "tok-mock"
+TOKEN = "e2e-test-session-token"
 
 
 class MockUpstream:

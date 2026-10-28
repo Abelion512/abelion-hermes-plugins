@@ -10,7 +10,7 @@ from support.host import make_profile, run_hermes, wire_text, requires_hermes
 
 pytestmark = requires_hermes
 PLUGIN = [("pii-mask-abelion", "pii_mask_abelion")]
-CRED = "sk-proj-" + "SyntheticE2eCanary" + "7Xk29QmZ41AbCdEf"  # split so secret scanners ignore the synthetic canary
+CRED = "sk-proj-SyntheticE2eCanary7Xk29QmZ41AbCdEf"  # synthetic canary, not a real key
 PRIVATE = {"username": "abelion", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
            "nik": "3175091201900001", "credential": CRED,
            "home_path": "/home/abelion/Documents/rahasia.txt"}

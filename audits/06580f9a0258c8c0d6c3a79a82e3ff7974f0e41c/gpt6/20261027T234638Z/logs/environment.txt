@@ -1,0 +1,19 @@
+Sanitized audit environment capture; no environment dump included.
+UTC: 2026-10-27T23:46:38Z
+Python: Python 3.13.5
+Platform: Linux-6.18.55-x86_64-with-glibc2.41
+Git: git version 2.47.3
+
+Attempt:
+GIT_TERMINAL_PROMPT=0 git clone --no-checkout https://github.com/Abelion512/abelion-hermes-plugins.git <temporary-path>
+Exit code: 128
+Stderr: Could not resolve host: github.com
+
+`git ls-remote` failed with the same DNS error. GitHub API access worked to read the private repo's exact commit/tree/files/checks. This does not establish local checkout or local source-hash verification. The failed temporary clone directory was removed.
+
+Runner verification:
+`python -m py_compile runner/privacy_guard_million.py`
+Exit code: 0
+Meaning: Python syntax only, not test execution.
+
+No provider/model call, external transport, destructive command, real secret, profile install/activation, push/merge/deploy was executed by tests. Evidence publication writes only the audit folder on a new branch.

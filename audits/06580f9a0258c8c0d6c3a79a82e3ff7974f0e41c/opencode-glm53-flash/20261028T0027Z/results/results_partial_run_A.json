@@ -1,0 +1,54 @@
+{
+  "schema": "privacy-guard-audit/1",
+  "audit_agent": "opencode-glm53-flash",
+  "audit_run_id": "20261028T0027Z",
+  "tested_sha": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "tested_branch": "fix/privacy-classifier-case-invariance",
+  "partial_run": true,
+  "status": "phase A truncated mid-D2; phase B never started; results_A.json never written",
+  "counts_source": "logs/run_A.log checkpoints (recorded verbatim; authoritative)",
+  "seed": 2714620565,
+  "budget_total": 1000000,
+  "domains": {
+    "D1_field_classification": {
+      "planned": 200000,
+      "executed": 200000,
+      "unique_inputs": 67532,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 400000,
+      "complete": true
+    },
+    "D2_benign_name_false_positives": {
+      "planned": 140000,
+      "executed": 50000,
+      "unique_inputs": null,
+      "passed": 49756,
+      "failed": 244,
+      "skipped": 0,
+      "assertions": null,
+      "complete": false,
+      "note": "counts apply through the 50000-checkpoint; executions after the last checkpoint were not recorded before truncation (upper bound: <90000 additional)"
+    }
+  },
+  "totals": {
+    "planned": 1000000,
+    "executed_min": 250000,
+    "unique_inputs_min": 67532,
+    "passed_min": 249756,
+    "failed_min": 244,
+    "skipped": 0,
+    "not_run_min": 750000,
+    "assertions_min_D1_only": 400000,
+    "note": "not_run_min = remaining phase A (90000 D2 + 310000 D3 + 165000 D4 + 60000 D5) + full phase B (125000); conservative: counts include only checkpointed executions"
+  },
+  "test_double": "phase A ran without the native agent.redact seam (documented '[OUTPUT_WITHHELD:redactor_unavailable]' end-to-end path)",
+  "failures": {
+    "D2_benign_name_false_positives": {
+      "failed": 244,
+      "sample_rate": "0.488% of executions through the 50000-checkpoint (244/50000 plus any unrecorded tail)",
+      "samples": "not captured: fail-sample capture happens at end-of-run; run truncated before results_A.json was written"
+    }
+  }
+}

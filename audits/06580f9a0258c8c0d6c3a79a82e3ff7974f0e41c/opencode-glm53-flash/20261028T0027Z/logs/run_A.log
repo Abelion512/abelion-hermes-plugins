@@ -1,0 +1,18 @@
+  [A|D1_field_classification] 25000/200000 pass=25000 fail=0 rate=621/s
+  [A|D1_field_classification] 50000/200000 pass=50000 fail=0 rate=668/s
+  [A|D1_field_classification] 75000/200000 pass=75000 fail=0 rate=607/s
+  [A|D1_field_classification] 100000/200000 pass=100000 fail=0 rate=593/s
+  [A|D1_field_classification] 125000/200000 pass=125000 fail=0 rate=629/s
+  [A|D1_field_classification] 150000/200000 pass=150000 fail=0 rate=640/s
+  [A|D1_field_classification] 175000/200000 pass=175000 fail=0 rate=638/s
+  [A|D1_field_classification] 200000/200000 pass=200000 fail=0 rate=636/s
+[A] D1_field_classification: exec=200000 pass=200000 fail=0 uniq=67532 asserts=400000 (314.3s)
+  [A|D2_benign_name_false_positives] 25000/140000 pass=24898 fail=102 rate=291/s
+  [A|D2_benign_name_false_positives] 50000/140000 pass=49756 fail=244 rate=304/s
+  [A|D2_benign_name_false_positives] 75000/140000 pass=74626 fail=374 rate=321/s
+  [A|D2_benign_name_false_positives] 100000/140000 pass=99501 fail=499 rate=350/s
+  [A|D2_benign_name_false_positives] 125000/140000 pass=124361 fail=639 rate=413/s
+[A] D2_benign_name_false_positives: exec=140000 pass=139217 fail=783 uniq=140000 asserts=221658 (311.6s)
+  [A|D3_request_nested_payload_masking] 25000/310000 pass=24987 fail=13 rate=416/s
+  [A|D3_request_nested_payload_masking] 50000/310000 pass=49976 fail=24 rate=433/s
+  [A|D3_request_nested_payload_masking] 75000/310000 pass=74962 fail=38 rate=309/s

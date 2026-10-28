@@ -1,0 +1,33 @@
+== r1_authorization_header_leak.py
+dict  Authorization        expected=masked-or-denied actual=allow=True canary_forwarded=True
+prose Authorization        expected=masked-or-denied actual=allow=True canary_forwarded=True
+dict  Proxy-Authorization  expected=masked-or-denied actual=allow=True canary_forwarded=True
+prose Proxy-Authorization  expected=masked-or-denied actual=allow=True canary_forwarded=True
+dict  authorization        expected=masked-or-denied actual=allow=True canary_forwarded=True
+prose authorization        expected=masked-or-denied actual=allow=True canary_forwarded=True
+== r2_tool_result_json_indirection.py
+guard  expected=masked-or-denied actual=allow=True canary_forwarded=True
+legacy expected=masked actual=canary_forwarded=True
+control (real dict) expected=masked actual=canary_forwarded=False
+== r3_legacy_underscore_flag.py
+expected=masked actual=forwarded=False verbatim='--api-key [REDACTED]_SECRET_FIELD'
+expected=masked actual=forwarded=True verbatim='--api_key SyntheticCanaryFlagZ3x7C1v5'
+expected=masked actual=forwarded=True verbatim='--client_secret SyntheticCanaryFlagZ3x7C1v5'
+colon expected=masked actual=forwarded=False verbatim='api_key: [REDACTED]_SECRET_FIELD'
+colon expected=masked actual=forwarded=True verbatim='api_key: SyntheticCanaryFlagZ3x7C1v5 tail'
+== r4_optional_cookie_header.py
+optional expected=documented-not-guaranteed actual=canary_forwarded=True
+required expected=denied actual=allow=False reason=session_material
+== r5_false_positive_api_help.py
+password_help        actual=None
+apikey_help          actual=SECRET
+api_key_help         actual=SECRET
+secret_menu          actual=None
+password_message     actual=None
+password_hash        actual=None
+token_hash           actual=None
+== r6_short_literal_reoccurrence.py
+first  expected=masked actual=password=<HG:7d82930f8df2eda2c1c5514f:78bfc451da28a072f8fce27a>
+second expected=masked actual='ab' forwarded=True
+== r7_none_redactor_discards_layer1.py
+expected=withheld_or_masked actual='w0 w1 SyntheticProseNoneZ1q3W5e7 (password) tail' canary_forwarded=True

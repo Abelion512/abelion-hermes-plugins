@@ -1,0 +1,274 @@
+{
+  "schema": "privacy-guard-audit-combined/1",
+  "tested_sha": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "seed": 20261028,
+  "sources": [
+    "results.json",
+    "results_supplementary.json"
+  ],
+  "note": "Primary run executed 995,824 and skipped 4,176 D1 slots under an over-conservative rule; the supplementary run executed exactly those 4,176 slots. No completed case was re-executed.",
+  "primary_duration_seconds": 1261.13,
+  "supplementary_duration_seconds": 3.113,
+  "domains": {
+    "D1_field_classification": {
+      "planned": 250000,
+      "executed": 250000,
+      "unique_inputs": 245356,
+      "passed": 246544,
+      "failed": 3456,
+      "skipped": 0,
+      "assertions": 250000,
+      "fail_rate_of_executed": 0.014059,
+      "rules": {
+        "classify_mismatch": 3456,
+        "completed_by_supplementary": 4176
+      },
+      "samples": {
+        "skip:label_word_out_of_scope": [
+          "db_lms_email_name",
+          "db_email_name",
+          "app_lms_email_name",
+          "db_lms_email_count_raw",
+          "db_email_count_raw",
+          "app_lms_email_count_raw"
+        ],
+        "classify_mismatch": [
+          {
+            "name": "db_apikey_label_raw",
+            "parts": [
+              "db",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          },
+          {
+            "name": "app_apikey_label_raw",
+            "parts": [
+              "app",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          },
+          {
+            "name": "user_apikey_label_raw",
+            "parts": [
+              "user",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          },
+          {
+            "name": "myco_apikey_label_raw",
+            "parts": [
+              "myco",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          },
+          {
+            "name": "acme_apikey_label_raw",
+            "parts": [
+              "acme",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          },
+          {
+            "name": "svc_apikey_label_raw",
+            "parts": [
+              "svc",
+              "apikey",
+              "label",
+              "raw"
+            ],
+            "expected": null,
+            "actual": "SECRET"
+          }
+        ]
+      },
+      "skipped_primary": 4176,
+      "skipped_path": "completed by results_supplementary.json"
+    },
+    "D2_benign_name_false_positive": {
+      "planned": 150000,
+      "executed": 150000,
+      "unique_inputs": 150000,
+      "passed": 150000,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 450000,
+      "fail_rate_of_executed": 0.0,
+      "rules": {},
+      "samples": {}
+    },
+    "D3_request_nested_masking": {
+      "planned": 250000,
+      "executed": 250000,
+      "unique_inputs": 250000,
+      "passed": 197988,
+      "failed": 52012,
+      "skipped": 0,
+      "assertions": 934809,
+      "fail_rate_of_executed": 0.208048,
+      "rules": {
+        "sensitive_value_forwarded": 52012
+      },
+      "samples": {
+        "sensitive_value_forwarded": [
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 1
+          },
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 2
+          },
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 3
+          },
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 5
+          },
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 8
+          },
+          {
+            "engine": "legacy",
+            "form": "content_text",
+            "key": "Hf_token",
+            "depth": 30
+          }
+        ]
+      }
+    },
+    "D4_placeholder_session_boundary": {
+      "planned": 150000,
+      "executed": 150000,
+      "unique_inputs": 150000,
+      "passed": 150000,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 150000,
+      "fail_rate_of_executed": 0.0,
+      "rules": {},
+      "samples": {}
+    },
+    "D5_output_redaction": {
+      "planned": 100000,
+      "executed": 100000,
+      "unique_inputs": 100000,
+      "passed": 90800,
+      "failed": 9200,
+      "skipped": 0,
+      "assertions": 120000,
+      "fail_rate_of_executed": 0.092,
+      "rules": {
+        "redactor_error_not_withheld": 4880,
+        "good_redactor_output_dropped": 4320
+      },
+      "samples": {
+        "redactor_error_not_withheld": [
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012504Zq (  secrets  ) tail"
+          },
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012509Zq (  credential  ) tail"
+          },
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012514Zq (  credentials  ) tail"
+          },
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012519Zq (  token  ) tail"
+          },
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012524Zq (  apikey  ) tail"
+          },
+          {
+            "mode": "none",
+            "got": "w0 w1 w2 SyntheticProse012529Zq (  email  ) tail"
+          }
+        ],
+        "good_redactor_output_dropped": [
+          {
+            "mode": "strip",
+            "got": "*** (password) tail"
+          },
+          {
+            "mode": "strip",
+            "got": "*** (pass) tail"
+          },
+          {
+            "mode": "strip",
+            "got": "*** (pw) tail"
+          },
+          {
+            "mode": "strip",
+            "got": "*** (secret) tail"
+          },
+          {
+            "mode": "strip",
+            "got": "*** (secrets) tail"
+          },
+          {
+            "mode": "strip",
+            "got": "*** (credential) tail"
+          }
+        ]
+      }
+    },
+    "D6_case_fix_regression": {
+      "planned": 100000,
+      "executed": 100000,
+      "unique_inputs": 5042,
+      "passed": 100000,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 100000,
+      "fail_rate_of_executed": 0.0,
+      "rules": {},
+      "samples": {}
+    }
+  },
+  "totals": {
+    "planned": 1000000,
+    "executed": 1000000,
+    "unique_inputs": 900398,
+    "passed": 935332,
+    "failed": 64668,
+    "skipped": 0,
+    "assertions": 2004809
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "privacy-guard-audit-supplementary/1",
+  "tested_sha": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "seed": 20261028,
+  "kind": "D1 skipped-slot completion",
+  "selection": "primary D1 indices where expected is None and a LABEL word is present",
+  "recorded_primary_skips": 4176,
+  "selected": 4176,
+  "executed": 4176,
+  "unique_inputs": 4176,
+  "passed": 4176,
+  "failed": 0,
+  "skipped": 0,
+  "assertions": 4176,
+  "fail_samples": [],
+  "duration_seconds": 3.113,
+  "note": "No completed case from the primary run was re-executed."
+}

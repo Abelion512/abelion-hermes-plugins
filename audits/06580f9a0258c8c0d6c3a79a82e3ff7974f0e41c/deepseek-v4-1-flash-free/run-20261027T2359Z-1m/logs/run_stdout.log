@@ -1,0 +1,8 @@
+sha=06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c scale=1.0 duration=1261.1s
+D1_field_classification: executed=245824 pass=242368 fail=3456 skip=4176 unique=241180 assertions=245824
+D2_benign_name_false_positive: executed=150000 pass=150000 fail=0 skip=0 unique=150000 assertions=450000
+D3_request_nested_masking: executed=250000 pass=197988 fail=52012 skip=0 unique=250000 assertions=934809
+D4_placeholder_session_boundary: executed=150000 pass=150000 fail=0 skip=0 unique=150000 assertions=150000
+D5_output_redaction: executed=100000 pass=90800 fail=9200 skip=0 unique=100000 assertions=120000
+D6_case_fix_regression: executed=100000 pass=100000 fail=0 skip=0 unique=5042 assertions=100000
+TOTAL: executed=995824 pass=931156 fail=64668 skip=4176 unique=896222 assertions=2000633

@@ -1,0 +1,46 @@
+generation-only analysis; no implementation call, no test re-execution
+generated_cases 250000
+predicted_skip_cases 4176
+expected_None_non_skip 147328
+expected_None_non_skip_with_api_then_key_pair 7634
+top families (core, suffix, tail2) -> count
+  (('api', 'key'), 'name', '') 36
+  (('apikey',), 'name', '') 36
+  (('api', 'key'), 'path', '') 36
+  (('apikey',), 'path', '') 36
+  (('api', 'key'), 'file', '') 36
+  (('apikey',), 'file', '') 36
+  (('api', 'key'), 'filename', '') 36
+  (('apikey',), 'filename', '') 36
+  (('api', 'key'), 'dir', '') 36
+  (('apikey',), 'dir', '') 36
+  (('api', 'key'), 'folder', '') 36
+  (('apikey',), 'folder', '') 36
+glued_apikey_tail_rule_disagreement_cases 3456
+distinct_names 1800
+by_remaining_tail
+   (('apikey',), ('name', 'v1')) 36
+   (('apikey',), ('filename', 'v1')) 36
+   (('apikey',), ('dir', 'v1')) 36
+   (('apikey',), ('folder', 'v1')) 36
+   (('apikey',), ('label', 'v1')) 36
+   (('apikey',), ('type', 'v1')) 36
+   (('apikey',), ('env', 'v1')) 36
+   (('apikey',), ('var', 'v1')) 36
+   (('apikey',), ('header', 'v1')) 36
+   (('apikey',), ('field', 'v1')) 36
+   (('apikey',), ('prefix', 'v1')) 36
+   (('apikey',), ('location', 'v1')) 36
+   (('apikey',), ('policy', 'v1')) 36
+   (('apikey',), ('mode', 'v1')) 36
+   (('apikey',), ('format', 'v1')) 36
+   (('apikey',), ('kind', 'v1')) 36
+   (('apikey',), ('length', 'v1')) 36
+   (('apikey',), ('required', 'v1')) 36
+   (('apikey',), ('enabled', 'v1')) 36
+   (('apikey',), ('hint', 'v1')) 36
+   (('apikey',), ('manager', 'v1')) 36
+   (('apikey',), ('page', 'v1')) 36
+   (('apikey',), ('wiki', 'v1')) 36
+   (('apikey',), ('docs', 'v1')) 36
+   (('apikey',), ('doc', 'v1')) 36

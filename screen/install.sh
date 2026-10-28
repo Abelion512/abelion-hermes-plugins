@@ -33,6 +33,19 @@ elif [ -n "$RAW" ]; then
   exit 1
 fi
 
+# Validate IDs before any backup, move, install or config mutation. The list is
+# serialized below, so accept only native plugin slugs rather than shell/JSON text.
+if [ -n "$CURRENT" ]; then
+  while IFS= read -r n; do
+    [ -z "$n" ] && continue
+    if [[ ! "$n" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      echo "!! plugins.enabled contains an unsupported plugin ID: $n"
+      echo "!! Installer stopped before changing files or config."
+      exit 1
+    fi
+  done <<< "$CURRENT"
+fi
+
 # --- 2) backups --------------------------------------------------------------
 if [ -f "$CFG" ]; then
   cp -p "$CFG" "$CFG.bak-screen-$TS"
@@ -46,8 +59,8 @@ fi
 # --- 3) install + official enable (merge, sorted-unique) ---------------------
 mkdir -p "$DEST/screen"
 cp -r dashboard "$DEST/screen/dashboard"
-cp -f plugin.yaml "$DEST/screen/plugin.yaml" 2>/dev/null || true
-cp -f __init__.py "$DEST/screen/__init__.py" 2>/dev/null || true
+cp -f plugin.yaml "$DEST/screen/plugin.yaml"
+cp -f __init__.py "$DEST/screen/__init__.py"
 if [ -d skills ]; then
   cp -r skills "$DEST/screen/skills"
   echo ">> skills agent tersalin ke $DEST/screen/skills"
@@ -58,13 +71,18 @@ fi
 echo ">> plugin tersalin ke $DEST/screen"
 
 json="["; first=1
-{ echo "screen"; if [ -n "$CURRENT" ]; then printf '%s\n' "$CURRENT"; fi; } \
-  | sort -u > /tmp/.sv-names.$$.txt
+TMP_NAMES="$(mktemp "${TMPDIR:-/tmp}/hermes-screen-plugin-names.XXXXXX")"
+trap 'rm -f "$TMP_NAMES"' EXIT
+{ printf '%s\\n' "screen"; if [ -n "$CURRENT" ]; then printf '%s\\n' "$CURRENT"; fi; } \\
+  | sort -u > "$TMP_NAMES"
 while IFS= read -r n; do
-  n="${n//\"/}"; [ -z "$n" ] && continue
-  if [ "$first" = "1" ]; then json="$json\"$n\""; first=0; else json="$json, \"$n\""; fi
-done < /tmp/.sv-names.$$.txt
-rm -f /tmp/.sv-names.$$.txt
+  [ -z "$n" ] && continue
+  if [[ ! "$n" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "!! invalid plugin ID refused while serializing plugins.enabled: $n"
+    exit 1
+  fi
+  if [ "$first" = "1" ]; then json="$json\\"$n\\""; first=0; else json="$json, \\"$n\\""; fi
+done < "$TMP_NAMES"
 json="$json]"
 
 hermes config set plugins.enabled "$json"

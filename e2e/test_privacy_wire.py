@@ -14,7 +14,7 @@ CRED = "sk-proj-SyntheticE2eCanary7Xk29QmZ41AbCdEf"  # synthetic canary, not a r
 PRIVATE = {"username": "private_user_canary_7mQ2", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
            "nik": "3175091201900001", "credential": CRED,
            "home_path": "/home/abelion/Documents/rahasia.txt"}
-REQUIRED_CONFIG = "security:\\n  require_privacy_guard: true\\n  privacy_guard_plugin: pii-mask-abelion\\n"
+REQUIRED_CONFIG = "security:\n  require_privacy_guard: true\n  privacy_guard_plugin: pii-mask-abelion\n"
 PROMPT = ("username: private_user_canary_7mQ2\nlogin as private_user_canary_7mQ2\nemail: bob.santoso@example.com\nHP +62 812-3456-7890\n"
           "NIK 3175091201900001\nOPENAI_API_KEY=" + CRED + "\n"
           "file /home/abelion/Documents/rahasia.txt\nsay hi")

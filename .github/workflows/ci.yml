@@ -180,7 +180,7 @@ jobs:
           # Keep browser tooling outside the Hermes workspace; install the CLI explicitly.
           E2E_NODE="$RUNNER_TEMP/e2e-node"
           mkdir -p "$E2E_NODE"
-          printf '%s\\n' '{"private":true,"name":"hermes-plugin-e2e-tools"}' > "$E2E_NODE/package.json"
+          printf '%s' '{"private":true,"name":"hermes-plugin-e2e-tools"}' > "$E2E_NODE/package.json"
           npm install --prefix "$E2E_NODE" --no-audit --no-fund puppeteer@24.31.0
           export PUPPETEER_CACHE_DIR="$RUNNER_TEMP/puppeteer-cache"
           rm -rf "$PUPPETEER_CACHE_DIR"

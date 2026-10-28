@@ -13,7 +13,7 @@ Earlier three-package evidence (historical, before the classifier/auth/JSON fixe
 - Disposable seven-to-three native removal/restart and pinned snapshot rollback passed, retaining mandatory privacy owner and one output hook.
 - Uploaded 278-case matrix: 170 pass, 10 fail, 98 retired Shield targets not run. Original expectations preserved. See validation/README.md. Not all green.
 
-Remaining limitations: synthetic local requests, no actual provider proof, no complete Screen interaction suite and no daily-profile migration. Offline 9Router curated models are not verified inventory. Scanner success is not proof every secret format is detectable.
+Remaining limitations: E2E provider traffic is loopback-only, not a real external-provider run; Screen coverage is limited to dashboard lease/input flows and does not cover model-driven computer_use, phone/Tailscale, abrupt tab close or a user's own desktop. Daily-profile migration is not performed or verified. Offline 9Router curated models are not verified inventory. Scanner success is not proof every secret format is detectable.
 
 Run retained tests with the matched host importable, or the minimal standalone environment. Retired tests remain in pinned Git history (see rollback/README.md) and are excluded from the active test suite; fewer tests do not mean regressions were fixed. See MIGRATION.md for stopped disposable-profile migration and pinned rollback order.
 

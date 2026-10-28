@@ -177,25 +177,23 @@ jobs:
           echo "HERMES_PYTHON=$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" >> "$GITHUB_ENV"
           # Dashboard's --skip-build mode requires the matching, fresh web_dist in Hermes core.
           (cd hermes-core && npm install --workspace web && npm run build -w web)
-          # Keep browser tooling outside the Hermes workspace. npm 11 blocks
-          # lifecycle scripts unless this isolated package explicitly approves Puppeteer's
-          # pinned install script; PUPPETEER_CACHE_DIR is set before installation.
+          # Use the exact Chrome for Testing build paired with Puppeteer 24.31.0.
+          # Install puppeteer-core only; browser download/install scripts are not needed.
           E2E_NODE="$RUNNER_TEMP/e2e-node"
           mkdir -p "$E2E_NODE"
-          export PUPPETEER_CACHE_DIR="$RUNNER_TEMP/puppeteer-cache"
-          rm -rf "$PUPPETEER_CACHE_DIR"
-          printf '%s' '{"private":true,"name":"hermes-plugin-e2e-tools","allowScripts":{"puppeteer":true}}' > "$E2E_NODE/package.json"
-          npm install --prefix "$E2E_NODE" --no-audit --no-fund puppeteer@24.31.0
-          chrome="$(node -e "console.log(require(process.argv[1]).executablePath())" "$E2E_NODE/node_modules/puppeteer")"
-          if [ ! -x "$chrome" ]; then
-            # A blocked/partial postinstall can leave the version directory behind without Chrome.
-            rm -rf "$PUPPETEER_CACHE_DIR/chrome"
-            "$E2E_NODE/node_modules/.bin/puppeteer" install chrome
-            chrome="$(node -e "console.log(require(process.argv[1]).executablePath())" "$E2E_NODE/node_modules/puppeteer")"
-          fi
-          test -x "$chrome" || { echo "Puppeteer Chrome binary missing: $chrome"; find "$PUPPETEER_CACHE_DIR" -maxdepth 6 -type f -name chrome -print; exit 1; }
+          printf '%s' '{"private":true,"name":"hermes-plugin-e2e-tools"}' > "$E2E_NODE/package.json"
+          npm install --prefix "$E2E_NODE" --no-audit --no-fund puppeteer-core@24.31.0
+          CHROME_FOR_TESTING_VERSION="142.0.7444.175"
+          CHROME_ZIP="$RUNNER_TEMP/chrome-for-testing-${CHROME_FOR_TESTING_VERSION}.zip"
+          CHROME_ROOT="$RUNNER_TEMP/chrome-for-testing-${CHROME_FOR_TESTING_VERSION}"
+          curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_FOR_TESTING_VERSION}/linux64/chrome-linux64.zip" -o "$CHROME_ZIP"
+          rm -rf "$CHROME_ROOT"
+          mkdir -p "$CHROME_ROOT"
+          unzip -q "$CHROME_ZIP" -d "$CHROME_ROOT"
+          chrome="$CHROME_ROOT/chrome-linux64/chrome"
+          test -x "$chrome"
+          node -e "require('puppeteer-core')"
           echo "NODE_PATH=$E2E_NODE/node_modules" >> "$GITHUB_ENV"
-          echo "PUPPETEER_CACHE_DIR=$PUPPETEER_CACHE_DIR" >> "$GITHUB_ENV"
           echo "SCREEN_E2E_CHROME=$chrome" >> "$GITHUB_ENV"
       - name: Verify exact host revision and Screen prerequisites
         run: |

@@ -188,10 +188,12 @@ jobs:
           npm install --prefix "$E2E_NODE" --no-audit --no-fund puppeteer@24.31.0
           chrome="$(node -e "console.log(require(process.argv[1]).executablePath())" "$E2E_NODE/node_modules/puppeteer")"
           if [ ! -x "$chrome" ]; then
-            "$E2E_NODE/node_modules/.bin/puppeteer" browsers install chrome
+            # A blocked/partial postinstall can leave the version directory behind without Chrome.
+            rm -rf "$PUPPETEER_CACHE_DIR/chrome"
+            "$E2E_NODE/node_modules/.bin/puppeteer" install chrome
             chrome="$(node -e "console.log(require(process.argv[1]).executablePath())" "$E2E_NODE/node_modules/puppeteer")"
           fi
-          test -x "$chrome"
+          test -x "$chrome" || { echo "Puppeteer Chrome binary missing: $chrome"; find "$PUPPETEER_CACHE_DIR" -maxdepth 6 -type f -name chrome -print; exit 1; }
           echo "NODE_PATH=$E2E_NODE/node_modules" >> "$GITHUB_ENV"
           echo "PUPPETEER_CACHE_DIR=$PUPPETEER_CACHE_DIR" >> "$GITHUB_ENV"
           echo "SCREEN_E2E_CHROME=$chrome" >> "$GITHUB_ENV"

@@ -2,6 +2,6 @@
 
 Input -> type/shape -> requirement/value -> effect -> confirmed outcome. A failed branch stops before the corresponding effect; it is not a successful operation.
 
-Model discovery bounds response size, requires an object/list payload and nonempty string IDs with the supported identifier alphabet. Invalid IDs are excluded, duplicates removed; malformed/unavailable responses retain the existing curated fallback, not proof of live availability.
+Model discovery reads at most 1 MiB from the local `/v1/models` response, requires an object containing a data list, accepts only nonempty string IDs from the supported identifier alphabet, and removes duplicates. Oversized, malformed or unavailable responses yield no advertised IDs. There is no static curated fallback.
 
-Tested in isolated development fixtures. This is not proof of the installed laptop source/runtime or a deployment.
+The adapter is disabled in this repository's install manifest. Tests use synthetic response bodies and do not contact a live 9Router service. This is not proof of installed-laptop behavior or current live model availability.

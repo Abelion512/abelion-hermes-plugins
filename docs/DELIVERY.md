@@ -1,39 +1,64 @@
 # Delivery and compatibility
 
-Three-package review candidate, published in existing PR #4. Main is not merged; no install, activation, Pages deployment or daily-profile change has been made. The closed privacy core remains unmerged and unadopted.
+## Current status
 
-Privacy Guard needs held-output registration. Mandatory protection needs the matching required-privacy core, verified locally at 9a85916c87d56c2ca00b02fad8918f93ef1816e9. Version labels alone do not prove compatibility. Current-upstream native features were compared in documentation/source, not verified on the laptop.
+PR #4 is a source-review candidate, not a merged or installed release. No daily-profile installation, activation, Pages deployment, or laptop migration has been performed.
 
-The previous six-plugin candidate had 145 passed plus one expected boundary xfail; minimal standalone had 65 passed and six integration skips; its actual-core boundary run had 59 passed in one complete canonical run. Those counts are historical and must not be presented as a fresh three-package result.
+**Merge gate:** the required checks must pass on the exact current PR HEAD, including the pinned-core E2E job. A green unit suite alone is not sufficient. The current result is shown in [PR #4](https://github.com/Abelion512/abelion-hermes-plugins/pull/4) and its [Actions runs](https://github.com/Abelion512/abelion-hermes-plugins/actions).
 
-Earlier three-package evidence (historical, before the classifier/auth/JSON fixes):
-- Configured privacy suite: 72 passed, 1 expected boundary xfail (not a pass).
-- Combined active suite without host test helpers resolving: 125 passed, 3 explicit integration skips. Do not add this count to the privacy count: they overlap. Minimal standalone: 70 passed, 6 explicit integration skips.
-- Actual closed core 9a85916: one complete direct canonical per-file-runner execution, 59 passed, 0 failed in 104.8s, clean environment. The shell wrapper had previously exceeded the outer time limit, so only the completed direct run supports this claim.
-- Disposable seven-to-three native removal/restart and pinned snapshot rollback passed, retaining mandatory privacy owner and one output hook.
-- Uploaded 278-case matrix: 170 pass, 10 fail, 98 retired Shield targets not run. Original expectations preserved. See validation/README.md. Not all green.
+## Package boundaries
 
-Remaining limitations: E2E provider traffic is loopback-only, not a real external-provider run; Screen coverage is limited to dashboard lease/input flows and does not cover model-driven computer_use, phone/Tailscale, abrupt tab close or a user's own desktop. Daily-profile migration is not performed or verified. Offline 9Router curated models are not verified inventory. Scanner success is not proof every secret format is detectable.
+| Package | Runtime ID | Current contract |
+|---|---|---|
+| Privacy Guard | `pii-mask-abelion` | Session-local request/tool masking and held-output redaction. Mandatory policy enforcement depends on the pinned forked core described below. |
+| Bot Screen | `screen` | Dashboard-only view of the agent's virtual desktop, with a capability-gated input lease. It does not expose a user's personal display or pause other agent tools. |
+| 9Router Catalog | `9router` | Disabled in this repository's install manifest. The service itself is not modified. The adapter advertises validated IDs from the live local catalog only. |
 
-Run retained tests with the matched host importable, or the minimal standalone environment. Retired tests remain in pinned Git history (see rollback/README.md) and are excluded from the active test suite; fewer tests do not mean regressions were fixed. See MIGRATION.md for stopped disposable-profile migration and pinned rollback order.
+## Security boundaries and repairs
 
-## Current CI contract and historical maintenance evidence
+### Privacy Guard
 
-The current source of truth is the exact HEAD shown on [PR #4](https://github.com/Abelion512/abelion-hermes-plugins/pull/4), not a SHA copied into this document. Current E2E CI checks out Hermes core `9a85916c87d56c2ca00b02fad8918f93ef1816e9`, verifies that the imported code comes from that exact commit, and runs the real-provider-wire, 9Router lifecycle and Bot Screen tests. A missing or mismatched host is a hard failure rather than a skipped pass.
+Mandatory request/tool/output behavior is tied to the exact Hermes fork commit `9a85916c87d56c2ca00b02fad8918f93ef1816e9`. The plugin CI checks out that source and verifies the imported source's full Git HEAD. This does **not** certify stock Hermes or imply that the separate core patch has been merged/adopted upstream. Do not advertise universal privacy coverage: detection is heuristic, and this is not a process-wide network firewall.
 
-This evidence is specific to the pinned `Abelion512/hermes-4gent` commit. That commit remains unmerged/unadopted separately; a passing plugin CI run does not make mandatory privacy enforcement available on stock Hermes. Do not enable or describe mandatory protection on an unsupported host.
+The loopback E2E suite records request bodies that actually reach its local test provider, including auxiliary requests. Canary values are synthetic; no real API provider or real credentials are used.
 
-The measurements below are historical. Snapshot used for those measurements: `0fa17829691bcab8db7e7a6a29e88e6604860f46` (traceability only, **not the current head**):
-- [PR #4](https://github.com/Abelion512/abelion-hermes-plugins/pull/4), not merged. Push and PR CI each passed all six jobs.
-- Auth/JSON fix: 49 new unit regressions passed; privacy suite with official Hermes `7ee6d99c4f16df08cd6ca0b2c34abb81014db2ba`: 128 passed, one strict expected auxiliary-title failure. These counts overlap.
-- CLI-to-loopback provider checks cover auth/JSON prompt and tool replay. This is real local transport evidence, not an external-provider or installed-laptop test.
-- Historical scanner behavior and results are recorded here for traceability only. The current end-to-end job independently pins and verifies the Hermes host revision; a green result does not establish compatibility with stock Hermes or universal secret detection.
+### Bot Screen
 
-Maintenance review prepared on the same candidate (publication status is recorded by the PR revision):
-- Complete active tests with official Hermes `7ee6d99`: 189 passed, one known strict auxiliary-title expected failure. Minimal environment: 127 passed, eight explicit host integration skips. These are overlapping runs, not additive counts.
-- Classifier vocabulary indexing: 10,000 repeated field classifications, five trials, median 1.508 s before and 0.153 s after. Same workload and interpreter; 13,000 differential inputs preserved outputs. This is a classifier microbenchmark, not overall application speed.
-- PR #2 disposable tests: 34 passed; PR #5 disposable tests: nine passed. Neither plugin was installed or reactivated.
-- Native custom-provider discovery against a local synthetic OpenAI `/v1/models` server returned exact route/combo IDs and sent the configured Bearer header. This supports replacing the 9Router catalog adapter, not proof the installed picker/config or real gateway is migrated.
-- noVNC RFB/display entry files and pako license match upstream v1.7.0. Restored missing noVNC license/authors notices locally; not every vendor file has been certified unchanged.
+- The browser WebSocket uses Hermes's canonical `_ws_auth_ok` check. Missing, non-callable, or failing auth code denies the upgrade.
+- `HERMES_SCREEN_UPSTREAM` is ignored unless explicit test mode is enabled, and test mode accepts loopback `ws://` addresses only.
+- A one-time display ticket stays server-side and is consumed once. Message size is bounded at 16 MiB.
+- Installer plugin IDs are validated before any backup/move/config mutation, and temporary name lists use `mktemp` rather than a predictable path under `/tmp`.
+- Uninstall refuses to recursively delete a `plugins/screen` directory without a recognized `plugin.yaml`.
 
-No installed-laptop evidence is available. The auxiliary-title upgrade can be disabled with native `auxiliary.title_generation.model_upgrade_enabled: false`, but that is a separate reviewed configuration choice, not a general privacy fix or a change made here.
+The dashboard/browser E2E uses a disposable virtual desktop. It does not cover model-driven `computer_use`, phone/Tailscale connectivity, abrupt tab closure, or a user's own desktop. Test stubs do not prove runtime behavior beyond the tested code paths.
+
+### 9Router Catalog
+
+The static curated inventory was removed because the IDs could not be verified as currently available. Discovery now enforces a 1 MiB response cap, validates IDs and removes duplicates. When `/v1/models` is unreachable or malformed, the advertised list is empty instead of falling back to guessed/stale names. The adapter remains disabled from this repository's install/update manifest.
+
+## Test-data policy
+
+- `e2e/support/loopback_provider.py` is a synthetic OpenAI-compatible provider used only to record local test traffic.
+- `screen/tests/mock_upstream.py` is an in-process fixture for the pinned display/lease protocol. It is a test double, not a live Hermes gateway.
+- Canary credentials, names, email addresses, phone numbers, NIK-like values, file paths, model IDs and session tokens are synthetic. They must not be copied into production configuration or treated as real inventory.
+- No external model API is contacted by these tests, and the test harness strips inherited provider credentials from child processes.
+
+Removing these test fixtures would reduce security coverage, so they remain in test-only paths and are named/documented as such. There is no mock or curated fallback model catalogue in production code.
+
+## CI and verification contract
+
+The `e2e` job checks out the exact fork commit above, verifies source identity, builds the matching Hermes dashboard assets, installs a compatible browser, and runs the host tests with skips converted to failures for mandatory prerequisites. The plugin CI also runs unit tests, syntax checks, secret scanning and dependency audits.
+
+The exact final run status must be checked after the last commit. Historical run counts from earlier candidates are deliberately not copied here as if they were current evidence.
+
+## Known limits
+
+- No installed-laptop/runtime evidence is claimed.
+- Loopback provider-wire tests are not tests against an external provider.
+- Stock Hermes is not certified for required-policy enforcement without the matching core support.
+- Native `plugins disable` does not unregister an already-installed 9Router provider; the lifecycle test covers native `plugins remove` as the verified removal path.
+- Secret scanning and regex masking do not prove detection of every possible secret format.
+
+## Deployment and migration
+
+No deployment or user-profile change is part of this PR. Keep installation separate until current CI is green and the exact host/profile compatibility is reviewed. Do not run `update-plugins.sh` to fetch an unmerged candidate. Follow [migration guidance](MIGRATION.md) for stopped-profile changes and rollback.

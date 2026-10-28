@@ -14,6 +14,7 @@ CRED = "sk-proj-SyntheticE2eCanary7Xk29QmZ41AbCdEf"  # synthetic canary, not a r
 PRIVATE = {"username": "private_user_canary_7mQ2", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
            "nik": "3175091201900001", "credential": CRED,
            "home_path": "/home/abelion/Documents/rahasia.txt"}
+REQUIRED_CONFIG = "security:\\n  require_privacy_guard: true\\n  privacy_guard_plugin: pii-mask-abelion\\n"
 PROMPT = ("username: private_user_canary_7mQ2\nlogin as private_user_canary_7mQ2\nemail: bob.santoso@example.com\nHP +62 812-3456-7890\n"
           "NIK 3175091201900001\nOPENAI_API_KEY=" + CRED + "\n"
           "file /home/abelion/Documents/rahasia.txt\nsay hi")
@@ -44,7 +45,8 @@ def test_main_request_has_no_original_private_values(tmp_path):
 
 
 def test_auxiliary_requests_have_no_original_private_values(tmp_path):
-    srv = chat(tmp_path, PROMPT)
+    """Auxiliary traffic is guarded only when the matching host required-policy contract is enabled."""
+    srv = chat(tmp_path, PROMPT, extra_config=REQUIRED_CONFIG)
     assert srv.aux_requests(), "no auxiliary request observed (title generation)"
     assert [leaked(r) for r in srv.aux_requests()] == [[]] * len(srv.aux_requests())
 

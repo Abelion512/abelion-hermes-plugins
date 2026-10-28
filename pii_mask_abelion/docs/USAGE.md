@@ -14,8 +14,9 @@ Draft for review. Proof means an E2E in [`e2e/test_privacy_wire.py`](../../e2e/t
 
 | Desired behavior | Implemented | Proven by E2E |
 |---|---|---|
-| The model API never receives an original private value (credentials, usernames, PII), in any call | Main chat request only, through `llm_request`/`llm_execution` | Main request: yes. Auxiliary calls (session title): **no, they leak** (Hermes has no hook that can change an auxiliary request, a core limit) |
-| Mask what was missed; block what cannot be made safe | Masking yes. Blocking needs the required mode | Required mode: **no**, `llm_privacy` is an unknown middleware on this Hermes, so requests are still sent |
+| Mask recognized private values in ordinary main-chat requests | Optional `llm_request`/`llm_execution` plugin middleware | Main request: yes; E2E only certifies the synthetic cases listed below |
+| Enforce the required local policy before supported provider egress | Requires the matching `agent.privacy_guard` contract in the pinned Hermes core; unsupported stock hosts must reject this guarantee | Required-mode E2E records the actual loopback provider bodies, including auxiliary title requests; see current CI run before describing this as passing |
+| Optional mode protects auxiliary/title traffic | Not guaranteed by optional request middleware | No; enable required mode with the matching core if auxiliary egress must be guarded |
 | Tool results are masked before they reach the model | Yes | Yes (replay of a tool result) |
 | Placeholders are restored only to authorized local destinations, never sent back to the cloud | Documented local path slots only | **Not covered by an E2E** (UNRUN) |
 | Public text without a private value stays unchanged | Yes | Yes (benign text) |

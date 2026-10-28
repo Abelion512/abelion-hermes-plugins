@@ -42,14 +42,27 @@ def flow(tmp_path_factory):
     (h / "config.yaml").write_text(cfg)
     env = hermetic_env(home)
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
-    dash = subprocess.Popen([HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--port", str(port), "--no-open", "--skip-build", "--isolated"],
-                            env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    dashboard_log = tmp / "dashboard.log"
+    with dashboard_log.open("w", encoding="utf-8") as log:
+        dash = subprocess.Popen(
+            [HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--port", str(port), "--no-open", "--skip-build", "--isolated"],
+            env=env, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     try:
         for _ in range(60):
+            if dash.poll() is not None:
+                break
             try:
-                urllib.request.urlopen(f"http://127.0.0.1:{port}/screen", timeout=2); break
-            except Exception: time.sleep(1)
-        else: pytest.fail("dashboard did not start")
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/screen", timeout=2) as response:
+                    if response.status < 500:
+                        break
+            except Exception:
+                time.sleep(1)
+        else:
+            tail = dashboard_log.read_text(encoding="utf-8", errors="replace")[-5000:]
+            pytest.fail(f"dashboard did not serve /screen (exit={dash.poll()}); log:\\n{tail}")
+        if dash.poll() is not None:
+            tail = dashboard_log.read_text(encoding="utf-8", errors="replace")[-5000:]
+            pytest.fail(f"dashboard exited before becoming ready (exit={dash.returncode}); log:\\n{tail}")
         bd = h / "bot-desktop"
         def run(): # desktop state is created on Connect; driver reads display lazily
             return subprocess.run([NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen", CHROME, str(tmp / "mk_"),
@@ -66,7 +79,8 @@ def flow(tmp_path_factory):
         yield json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"error": r.stderr[-300:]}
     finally:
         subprocess.run([HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--stop"], env=env, capture_output=True)
-        os.killpg(dash.pid, signal.SIGTERM)
+        if dash.poll() is None:
+            os.killpg(dash.pid, signal.SIGTERM)
         subprocess.run([HERMES_PYTHON, "-c", "from tools.bot_desktop import runtime as r; r.stop()"], env=env, capture_output=True)
         subprocess.run(["pkill", "-f", f"{h}/bot-desktop"], capture_output=True)
 

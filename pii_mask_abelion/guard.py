@@ -185,6 +185,20 @@ class Guard:
         scan=TOKEN.sub(lambda m:' '*len(m[0]) if m[0] in s.entries else m[0],text)
         spans=self.spans(scan)
         if len(spans)>512:return MARKER
+        clean=[]
+        for a,b,k in sorted(spans,key=lambda t:(t[0],-(t[1]-t[0]))):
+            if any(a==x and b==y and text[x:y] in s.entries for x,y in protected):continue
+            if clean and a<clean[-1][1]:
+                x,y,old=clean[-1];clean[-1]=(x,max(y,b),'SECRET' if 'SECRET' in (old,k) else old)
+            else:clean.append((a,b,k))
+        for a,b,k in reversed(clean):
+            text=text[:a]+self.remember(s,text[a:b],k)+text[b:]
+
+        # A sensitive value can occur more than once in a single message:
+        # the first labeled occurrence is discovered above, but its new mapping
+        # did not exist when the original spans were collected. Re-scan after
+        # registering every new span so later unlabeled occurrences are masked
+        # in the SAME outbound payload, not merely on the next request.
         entries=list(s.entries.values())
         if len(entries)*len(text)>32_000_000:return MARKER
         for entry in entries:
@@ -194,15 +208,15 @@ class Guard:
                 end=i+len(entry.value)
                 left=i==0 or not (text[i-1].isalnum() or text[i-1]=='_')
                 right=end==len(text) or not (text[end].isalnum() or text[end]=='_')
-                if left and right:spans.append((i,end,entry.kind))
-                start=end
-        clean=[]
-        for a,b,k in sorted(spans,key=lambda t:(t[0],-(t[1]-t[0]))):
-            if any(a==x and b==y and text[x:y] in s.entries for x,y in protected):continue
-            if clean and a<clean[-1][1]:
-                x,y,old=clean[-1];clean[-1]=(x,max(y,b),'SECRET' if 'SECRET' in (old,k) else old)
-            else:clean.append((a,b,k))
-        for a,b,k in reversed(clean):text=text[:a]+self.remember(s,text[a:b],k)+text[b:]
+                if left and right:
+                    token=s.reverse.get(entry.value)
+                    if token:
+                        text=text[:i]+token+text[end:]
+                        start=i+len(token)
+                    else:
+                        start=end
+                else:
+                    start=end
         return text
 
     def walk(self,obj,s,key='',depth=0):

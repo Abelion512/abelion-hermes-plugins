@@ -1,0 +1,77 @@
+{
+  "target_sha": "06580f9a0258c8c0d6c3a79a82e3ff7974f0e41c",
+  "seed": 79600548668787,
+  "seed_hex": "0x4865726d6573",
+  "per_domain": 200000,
+  "expected_total": 1000000,
+  "duration_s": 137.42,
+  "native_agent_redact_available": false,
+  "domains": {
+    "classification": {
+      "planned": 200000,
+      "executed": 200000,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "assertions": 200000,
+      "unique_inputs_estimated": 260000,
+      "failures_count": 0
+    },
+    "false_positive": {
+      "planned": 200000,
+      "executed": 200000,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "assertions": 200000,
+      "unique_inputs_estimated": 0,
+      "failures_count": 0
+    },
+    "masking": {
+      "planned": 200000,
+      "executed": 200000,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "assertions": 200000,
+      "unique_inputs_estimated": 0,
+      "failures_count": 0
+    },
+    "session": {
+      "planned": 200000,
+      "executed": 200000,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "assertions": 200000,
+      "unique_inputs_estimated": 0,
+      "failures_count": 0
+    },
+    "redaction": {
+      "planned": 200000,
+      "executed": 200000,
+      "passed": 200000,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "assertions": 200000,
+      "unique_inputs_estimated": 0,
+      "failures_count": 0
+    }
+  },
+  "totals": {
+    "planned": 1000000,
+    "executed": 1000000,
+    "passed": 1000000,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "assertions": 1000000,
+    "unique_inputs_estimated": 260000
+  },
+  "failures_sample": []
+}

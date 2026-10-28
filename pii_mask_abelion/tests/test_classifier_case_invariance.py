@@ -101,3 +101,9 @@ def test_repaired_fields_through_real_hermes_cli(tmp_path):
     assert secret not in wire
     assert benign in wire
     # Auxiliary-call egress is checked by the separate known-boundary xfail.
+
+
+def test_field_vocabulary_buckets_keep_exact_order_and_membership():
+    for initial, words in cred._FIELD_BY_INITIAL.items():
+        assert words == tuple(w for w in cred._FIELD_WORD_ORDER if w[0] == initial)
+    assert {w for words in cred._FIELD_BY_INITIAL.values() for w in words} == set(cred._FIELD_WORD_ORDER)

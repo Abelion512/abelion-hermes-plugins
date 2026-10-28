@@ -51,3 +51,15 @@ def test_native_output_before_cli_restore_and_api_remains_masked():
     secret=g.remember(s,'synthetic-secret','SECRET')
     assert g.output(secret,session_id='one',platform='cli')==secret
     assert g.output(token,session_id='two',platform='cli')==MARKER
+
+
+def test_missing_native_redactor_withholds_before_cli_restore(monkeypatch):
+    import builtins
+    original = builtins.__import__
+    def importing(name, *args, **kwargs):
+        if name == 'agent.redact':
+            raise ImportError('synthetic missing native redactor')
+        return original(name, *args, **kwargs)
+    g = Guard(); token = g.remember(g.session('missing'), 'sample@example.invalid', 'PII')
+    monkeypatch.setattr(builtins, '__import__', importing)
+    assert g.output(token, session_id='missing', platform='cli') == MARKER

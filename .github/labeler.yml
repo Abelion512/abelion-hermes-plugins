@@ -32,3 +32,6 @@ dependencies:
           - ".github/dependabot.yml"
           - "**/requirements*.txt"
           - "**/plugin-requirements.txt"
+audit:
+  - changed-files:
+      - any-glob-to-any-file: "audits/**"

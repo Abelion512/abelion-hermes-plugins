@@ -21,3 +21,8 @@ def test_standalone_request_masks_synthetic_email():
     result = policy.required_policy("request", request={"model": "test", "messages": [{"role": "user", "content": "sample@example.com"}]}, session_id="test")
     assert result["allow"] is True
     assert "sample@example.com" not in json.dumps(result["request"])
+
+
+def test_audit_label_has_evidence_only_path():
+    config = (Path(__file__).resolve().parents[1] / '.github/labeler.yml').read_text()
+    assert 'audit:\n  - changed-files:\n      - any-glob-to-any-file: "audits/**"' in config

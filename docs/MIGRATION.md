@@ -8,4 +8,4 @@ No automatic migration or laptop change is performed. Source removal does not re
 4. Keep screen and model-providers/9router independently selected as needed. Restart with a fresh session. Check required owner, exactly one privacy output callback, the three retained packages and absence of retired callbacks. Do not reuse prior session placeholders.
 5. If this fails, stop and restore the pinned plugin/config snapshot together, restart with a new session. Do not bypass required privacy by turning it off to hide a migration failure.
 
-The rollback source archive is not a backup of a user's installed profile. Current local migration evidence is in DELIVERY.md. Installed laptop migration remains unverified and is not requested here.
+Retired source is recoverable from pinned Git history (see rollback/README.md), not a backup of a user's installed profile. Current local migration evidence is in DELIVERY.md. Installed laptop migration remains unverified and is not requested here.

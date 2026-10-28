@@ -123,6 +123,8 @@ _FIELD_WORDS = frozenset(
 _FIELD_WORD_ORDER = tuple(sorted(_FIELD_WORDS - {"filename"},
                                  key=lambda word: (word in {"tokens", "secrets", "passwords"}, -len(word), word)))
 
+_FIELD_BY_INITIAL = {ch: tuple(w for w in _FIELD_WORD_ORDER if w[0] == ch)
+                     for ch in {w[0] for w in _FIELD_WORD_ORDER}}
 
 def _segments(name: str) -> list[str]:
     parts: list[str] = []
@@ -140,7 +142,7 @@ def _segments(name: str) -> list[str]:
         # is token + secret, not tokens + an unknown "ecret" suffix.
         parsed: dict[int, list[str]] = {len(chunk): []}
         for index in range(len(chunk) - 1, -1, -1):
-            for word in _FIELD_WORD_ORDER:
+            for word in _FIELD_BY_INITIAL.get(chunk[index], ()):
                 end = index + len(word)
                 if chunk.startswith(word, index) and end in parsed:
                     parsed[index] = [word, *parsed[end]]
@@ -150,18 +152,18 @@ def _segments(name: str) -> list[str]:
             continue
         # An unknown vendor prefix may precede known semantic words.
         offset = next((index for index in range(1, len(chunk)) if index in parsed), None)
-        if offset is not None and not any(chunk.startswith(word) for word in _FIELD_WORD_ORDER):
+        if offset is not None and not any(chunk.startswith(word) for word in _FIELD_BY_INITIAL.get(chunk[0], ())):
             parts.extend([chunk[:offset], *parsed[offset]])
         else:
             # Preserve recognized words around unknown vendor text too.
             while chunk:
-                word = next((word for word in _FIELD_WORD_ORDER if chunk.startswith(word)), None)
+                word = next((word for word in _FIELD_BY_INITIAL.get(chunk[0], ()) if chunk.startswith(word)), None)
                 if word is not None:
                     parts.append(word)
                     chunk = chunk[len(word):]
                     continue
                 offset = next((index for index in range(1, len(chunk))
-                               if any(chunk.startswith(word, index) for word in _FIELD_WORD_ORDER)), None)
+                               if any(chunk.startswith(word, index) for word in _FIELD_BY_INITIAL.get(chunk[index], ()))), None)
                 if offset is None:
                     parts.append(chunk)
                     break

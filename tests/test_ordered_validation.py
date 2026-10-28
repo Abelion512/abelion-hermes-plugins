@@ -10,21 +10,11 @@ pytest.importorskip("hermes_constants", reason="cross-plugin integration require
 
 BASE=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BASE));os.environ['HERMES_HOME']=tempfile.mkdtemp(prefix='algo-tests-')
 
-BASE=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BASE));os.environ['HERMES_HOME']=tempfile.mkdtemp(prefix='algo-tests-')
-
-BASE=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BASE));os.environ['HERMES_HOME']=tempfile.mkdtemp(prefix='algo-tests-')
-
 from pii_mask_abelion.guard import Guard
 
 from pii_mask_abelion.output_redact import redact_output
 
 spec=importlib.util.spec_from_file_location('screen_api_test',BASE/'screen/dashboard/plugin_api.py');screen=importlib.util.module_from_spec(spec);spec.loader.exec_module(screen)
-
-spec=importlib.util.spec_from_file_location('screen_api_test',BASE/'screen/dashboard/plugin_api.py');screen=importlib.util.module_from_spec(spec);spec.loader.exec_module(screen)
-
-spec=importlib.util.spec_from_file_location('screen_api_test',BASE/'screen/dashboard/plugin_api.py');screen=importlib.util.module_from_spec(spec);spec.loader.exec_module(screen)
-
-spec=importlib.util.spec_from_file_location('nine_test',BASE/'model-providers/9router/__init__.py');nine=importlib.util.module_from_spec(spec)
 
 spec=importlib.util.spec_from_file_location('nine_test',BASE/'model-providers/9router/__init__.py');nine=importlib.util.module_from_spec(spec)
 

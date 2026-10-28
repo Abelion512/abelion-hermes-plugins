@@ -1,7 +1,10 @@
-# Rollback source, not active plugins
+# Retired source recovery
 
-The archive preserves retired Shield, tool-context, RSI code and the previous cross-plugin integration test file from the tested six-plugin candidate. SHA256SUMS records integrity. It is not extracted under plugins and is not an install target. The previous complete six-plugin worktree is also preserved separately during local review.
+Retired Shield, tool-context, RSI source and earlier cross-plugin tests are no longer shipped in this checkout. They remain in Git at pinned revision `0fa17829691bcab8db7e7a6a29e88e6604860f46`:
 
-No installed RSI_LESSONS.md, JSONL metrics or user profile was read, changed, moved or deleted. This is source cleanup, not user-data migration.
+```sh
+git show 0fa17829691bcab8db7e7a6a29e88e6604860f46:rollback/pre-native-cleanup-source.tgz > /tmp/pre-native-cleanup-source.tgz
+printf '%s\n' 'eae0c7ed9491575d7cff02ba65da48fea98f4880b09c0081c6be1ac9b1038236  /tmp/pre-native-cleanup-source.tgz' | sha256sum -c -
+```
 
-For a reviewed disposable rollback, stop the process, restore pinned plugin/config snapshots together, then restart with a new session. Do not extract this archive into a live profile or assume restoration of source alone restores installed selection/settings. Required privacy must retain its matching core and owner. No automatic rollback script is provided.
+Fetch that revision first if your clone lacks it. Do not extract into a running profile. This is source recovery, not an installed-profile backup. Stop the disposable profile and restore pinned plugins, configuration and user data together; required privacy keeps its matching core and owner. Existing lesson files, metrics and installed copies are untouched.

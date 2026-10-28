@@ -177,14 +177,17 @@ jobs:
           echo "HERMES_PYTHON=$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" >> "$GITHUB_ENV"
           # Dashboard's --skip-build mode requires the matching, fresh web_dist in Hermes core.
           (cd hermes-core && npm install --workspace web && npm run build -w web)
-          npm install --no-save puppeteer@24.31.0
-          # npm 11 may leave a partial Puppeteer cache when install scripts are blocked.
-          # Isolate the cache, install Chrome explicitly, and fail unless the binary exists.
+          # Keep browser tooling outside the Hermes workspace; install the CLI explicitly.
+          E2E_NODE="$RUNNER_TEMP/e2e-node"
+          mkdir -p "$E2E_NODE"
+          printf '{"private":true,"name":"hermes-plugin-e2e-tools"}\\n' > "$E2E_NODE/package.json"
+          npm install --prefix "$E2E_NODE" --no-audit --no-fund puppeteer@24.31.0
           export PUPPETEER_CACHE_DIR="$RUNNER_TEMP/puppeteer-cache"
           rm -rf "$PUPPETEER_CACHE_DIR"
-          npx puppeteer browsers install chrome
-          chrome="$(node -e "console.log(require('puppeteer').executablePath())")"
+          "$E2E_NODE/node_modules/.bin/puppeteer" browsers install chrome
+          chrome="$(node -e "console.log(require(process.argv[1]).executablePath())" "$E2E_NODE/node_modules/puppeteer")"
           test -x "$chrome"
+          echo "NODE_PATH=$E2E_NODE/node_modules" >> "$GITHUB_ENV"
           echo "PUPPETEER_CACHE_DIR=$PUPPETEER_CACHE_DIR" >> "$GITHUB_ENV"
           echo "SCREEN_E2E_CHROME=$chrome" >> "$GITHUB_ENV"
       - name: Verify exact host revision and Screen prerequisites

@@ -27,7 +27,10 @@ def _missing():
     return m
 
 
-pytestmark = pytest.mark.skipif(bool(_missing()), reason="NOT RUN: missing " + ", ".join(_missing()))
+MISSING = _missing()
+if os.environ.get("REQUIRE_SCREEN_E2E") == "1" and MISSING:
+    raise RuntimeError("Screen E2E is required in CI; missing prerequisites: " + ", ".join(MISSING))
+pytestmark = pytest.mark.skipif(bool(MISSING), reason="NOT RUN: missing " + ", ".join(MISSING))
 
 
 @pytest.fixture(scope="module")

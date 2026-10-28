@@ -11,10 +11,10 @@ from support.host import make_profile, run_hermes, wire_text, requires_hermes
 pytestmark = requires_hermes
 PLUGIN = [("pii-mask-abelion", "pii_mask_abelion")]
 CRED = "sk-proj-SyntheticE2eCanary7Xk29QmZ41AbCdEf"  # synthetic canary, not a real key
-PRIVATE = {"username": "abelion", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
+PRIVATE = {"username": "private_user_canary_7mQ2", "email": "bob.santoso@example.com", "phone": "+62 812-3456-7890",
            "nik": "3175091201900001", "credential": CRED,
            "home_path": "/home/abelion/Documents/rahasia.txt"}
-PROMPT = ("username: abelion\nlogin as abelion\nemail: bob.santoso@example.com\nHP +62 812-3456-7890\n"
+PROMPT = ("username: private_user_canary_7mQ2\nlogin as private_user_canary_7mQ2\nemail: bob.santoso@example.com\nHP +62 812-3456-7890\n"
           "NIK 3175091201900001\nOPENAI_API_KEY=" + CRED + "\n"
           "file /home/abelion/Documents/rahasia.txt\nsay hi")
 
@@ -67,8 +67,10 @@ def test_benign_public_text_is_unchanged(tmp_path):
     assert text in wire_text(srv.main_requests()[0]).replace("\\n", "\n")
 
 
-def test_required_mode_on_unsupported_host_sends_nothing(tmp_path):
-    """security.require_privacy_guard needs a Hermes with the required-policy contract. A host without it
-    must stop before any provider request."""
-    srv = chat(tmp_path, PROMPT, extra_config="security:\n  require_privacy_guard: true\n  privacy_guard_plugin: pii-mask-abelion\n")
-    assert srv.requests == []
+def test_required_mode_masks_requests_before_provider_egress(tmp_path):
+    """With the required-policy core pinned by CI, every observed egress request must be sanitized."""
+    srv = chat(tmp_path, PROMPT,
+               extra_config="security:\n  require_privacy_guard: true\n  privacy_guard_plugin: pii-mask-abelion\n")
+    assert srv.main_requests(), "required mode neither sent a sanitized request nor reported a provider request"
+    assert srv.requests, "expected requests at the loopback provider"
+    assert [leaked(r) for r in srv.requests] == [[]] * len(srv.requests)

@@ -17,7 +17,7 @@ def _probe(code):
 
 
 OFFER = _probe("from hermes_cli.observability.shared_metrics_consent import OFFER_VERSION as v;print(v)")
-HERMES_COMMIT = _probe("import subprocess,hermes_cli,os;d=os.path.dirname(os.path.dirname(hermes_cli.__file__));print(subprocess.run(['git','-C',d,'rev-parse','--short=8','HEAD'],capture_output=True,text=True).stdout.strip())")
+HERMES_COMMIT = _probe("import subprocess,hermes_cli,os;d=os.path.dirname(os.path.dirname(hermes_cli.__file__));print(subprocess.run(['git','-C',d,'rev-parse','HEAD'],capture_output=True,text=True).stdout.strip())")
 requires_hermes = pytest.mark.skipif(OFFER is None, reason="NOT RUN: no Hermes install importable via HERMES_PYTHON")
 
 

@@ -1,7 +1,7 @@
 """9Router model provider plugin.
 
 Mendaftarkan 9Router sebagai provider di Hermes dengan daftar model lengkap
-dari endpoint lokal ``http://localhost:20128/v1/models``.
+dari endpoint lokal ``http://127.0.0.1:20128/v1/models``.
 
 Dengan ini, ``/model`` picker di CLI/gateway akan menampilkan semua model
 9Router sebagai opsi yang bisa dipilih tanpa harus inject manual di config.
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 SLUG = "9router"
 LABEL = "9Router"
-DESCRIPTION = "9Router multi-model gateway (localhost:20128)"
-BASE_URL = "http://localhost:20128/v1"
+DESCRIPTION = "9Router multi-model gateway (127.0.0.1:20128)"
+BASE_URL = "http://127.0.0.1:20128/v1"
 
 # Catalog is live-only. Do not publish an offline list of unverified model IDs.
 
@@ -41,7 +41,9 @@ def _fetch_models(timeout: float = 5.0) -> list[str] | None:
         if key:
             headers["Authorization"] = "Bearer " + key
         req = urllib.request.Request(f"{BASE_URL}/models", headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        # Never route a local API key through an environment HTTP(S) proxy.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(req, timeout=timeout) as resp:
             raw=resp.read(1_048_577)
             if len(raw)>1_048_576:return None
             payload = json.loads(raw.decode())

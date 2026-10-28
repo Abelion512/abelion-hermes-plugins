@@ -21,11 +21,23 @@ class _Response:
         return self.raw if size < 0 else self.raw[:size]
 
 
+class _StaticOpener:
+    def __init__(self, response=None, error=None):
+        self.response = response
+        self.error = error
+
+    def open(self, *args, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
 def _load(monkeypatch):
     # Prevent import-time registration from probing a real local gateway.
-    def no_network(*args, **kwargs):
-        raise OSError("network disabled in test")
-    monkeypatch.setattr(urllib.request, "urlopen", no_network)
+    monkeypatch.setattr(
+        urllib.request, "build_opener",
+        lambda *args, **kwargs: _StaticOpener(error=OSError("network disabled in test")),
+    )
     spec = importlib.util.spec_from_file_location("ninerouter_catalog_test", PLUGIN)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -47,11 +59,16 @@ def test_live_catalog_keeps_unique_valid_ids_only(monkeypatch):
         {"id": "openai/gpt-test"}, {"id": "openai/gpt-test"},
         {"id": "qwen3:coder"}, {"id": "invalid model"}, {"id": 42}, {},
     ]}).encode()
-    monkeypatch.setattr(module.urllib.request, "urlopen", lambda *a, **k: _Response(payload))
+    monkeypatch.setattr(module.urllib.request, "build_opener", lambda *a, **k: _StaticOpener(response=_Response(payload)))
     assert module._fetch_models() == ["openai/gpt-test", "qwen3:coder"]
 
 
 def test_live_catalog_response_size_is_bounded(monkeypatch):
     module = _load(monkeypatch)
-    monkeypatch.setattr(module.urllib.request, "urlopen", lambda *a, **k: _Response(b"x" * 1_048_577))
+    monkeypatch.setattr(module.urllib.request, "build_opener", lambda *a, **k: _StaticOpener(response=_Response(b"x" * 1_048_577)))
     assert module._fetch_models() is None
+
+
+def test_target_is_literal_ipv4_loopback_and_not_a_remote_host(monkeypatch):
+    module = _load(monkeypatch)
+    assert module.BASE_URL == "http://127.0.0.1:20128/v1"

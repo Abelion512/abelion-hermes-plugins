@@ -1,6 +1,6 @@
 # 9router - mechanism reference
 
-The backend registers a ProviderProfile for `http://localhost:20128/v1`.
+The backend registers a ProviderProfile for `http://127.0.0.1:20128/v1`.
 `NINEROUTER_API_KEY` is preferred, with `NINEROUTER_KEY` supported as an alias.
 Discovery sends Bearer auth when set, limits replies to 1 MiB and accepts only
 valid unique string IDs from the live `data` list. Combos are ordinary IDs.

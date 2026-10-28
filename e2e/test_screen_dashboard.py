@@ -1,0 +1,95 @@
+"""Screen plugin, real flow: real dashboard + real Bot Desktop (Xvnc/XFCE) + real Chrome.
+
+Requirements (otherwise NOT RUN, with the missing item named): Xvnc and xdotool on PATH, node with
+puppeteer-core resolvable (NODE_PATH), a Chrome (SCREEN_E2E_CHROME or google-chrome), HERMES_PYTHON.
+Host caveat: Bot Desktop refuses to start below its free-memory guard; SCREEN_E2E_MIN_FREE_MB lowers it
+for constrained CI hosts only (reported by the test, never a default).
+Not covered: model-driven computer_use, phone/Tailscale, abrupt tab close, a user's own desktop.
+"""
+import json, os, shutil, signal, socket, subprocess, sys, time, urllib.request
+from pathlib import Path
+import pytest
+from support.host import HERMES_PYTHON, OFFER, PLUGINS, hermetic_env
+
+CHROME = os.environ.get("SCREEN_E2E_CHROME") or shutil.which("google-chrome") or ""
+NODE = shutil.which("node")
+DRIVER = Path(__file__).parent / "support" / "screen_driver.js"
+
+
+def _missing():
+    m = []
+    if OFFER is None: m.append("Hermes (HERMES_PYTHON)")
+    for t in ("Xvnc", "xdotool", "xfce4-terminal"):
+        if not shutil.which(t): m.append(t)
+    if not NODE: m.append("node")
+    elif subprocess.run([NODE, "-e", "require('puppeteer-core')"], capture_output=True).returncode: m.append("puppeteer-core (NODE_PATH)")
+    if not CHROME: m.append("chrome (SCREEN_E2E_CHROME)")
+    return m
+
+
+pytestmark = pytest.mark.skipif(bool(_missing()), reason="NOT RUN: missing " + ", ".join(_missing()))
+
+
+@pytest.fixture(scope="module")
+def flow(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("screen"); home = tmp / "home"; h = home / ".hermes"; (h / "plugins").mkdir(parents=True)
+    shutil.copytree(PLUGINS / "screen", h / "plugins" / "screen", ignore=shutil.ignore_patterns("tests", "__pycache__"))
+    cfg = f"plugins:\n  enabled: [screen]\ntelemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n    offer_version: {OFFER}\n"
+    if os.environ.get("SCREEN_E2E_MIN_FREE_MB"): cfg += f"bot_desktop:\n  min_free_memory_mb: {int(os.environ['SCREEN_E2E_MIN_FREE_MB'])}\n"
+    (h / "config.yaml").write_text(cfg)
+    env = hermetic_env(home)
+    s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
+    dash = subprocess.Popen([HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--port", str(port), "--no-open", "--skip-build", "--isolated"],
+                            env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        for _ in range(60):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/screen", timeout=2); break
+            except Exception: time.sleep(1)
+        else: pytest.fail("dashboard did not start")
+        bd = h / "bot-desktop"
+        def run(): # desktop state is created on Connect; driver reads display lazily
+            return subprocess.run([NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen", CHROME, str(tmp / "mk_"),
+                                   str(bd / "Xauthority"), ":" + ((bd / "display").read_text().strip() if (bd / "display").exists() else "20")],
+                                  capture_output=True, text=True, timeout=120, env={**os.environ})
+        st = subprocess.run([HERMES_PYTHON, "-c", "from tools.bot_desktop import runtime as r; print(r.start(wait_seconds=60))"],
+                            env=env, capture_output=True, text=True, timeout=120)
+        if st.returncode: pytest.fail("desktop did not start: " + st.stderr[-300:])
+        disp = ":" + (bd / "display").read_text().strip()
+        term = subprocess.Popen(["xfce4-terminal"], env={**os.environ, "DISPLAY": disp, "XAUTHORITY": str(bd / "Xauthority")},
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        time.sleep(4)
+        r = run()
+        yield json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"error": r.stderr[-300:]}
+    finally:
+        subprocess.run([HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--stop"], env=env, capture_output=True)
+        os.killpg(dash.pid, signal.SIGTERM)
+        subprocess.run([HERMES_PYTHON, "-c", "from tools.bot_desktop import runtime as r; r.stop()"], env=env, capture_output=True)
+        subprocess.run(["pkill", "-f", f"{h}/bot-desktop"], capture_output=True)
+
+
+def test_connect_shows_live_view_under_agent_lease(flow):
+    assert "error" not in flow, flow
+    assert flow["steps"]["connected_lease"] == "agent"
+
+
+def test_typing_is_ignored_while_agent_holds_lease(flow):
+    assert flow["steps"]["typed_under_agent_lease"] is False
+
+
+def test_take_over_gives_human_lease_and_input_works(flow):
+    assert flow["steps"]["takeover_lease"] == "human"
+    assert flow["steps"]["typed_under_human_lease"] is True
+
+
+def test_reconnect_keeps_human_lease(flow):
+    assert flow["steps"]["reconnect_lease"] == "human" and flow["steps"]["typed_after_reconnect"] is True
+
+
+def test_hand_back_restores_view_only(flow):
+    assert flow["steps"]["handback_lease"] == "agent"
+    assert flow["steps"]["typed_after_handback"] is False
+
+
+def test_no_page_errors(flow):
+    assert flow["pageerrors"] == []

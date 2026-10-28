@@ -25,6 +25,7 @@ LABEL = re.compile(r'(?i)\b(?:username|user_name|email|phone|address|alamat|nik|
 ASSIGN = re.compile(r'(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})(?P<sep>["\']?\??[ \t]*(?:[:=]|%3[DdAa]|\t)[ \t]*)(?P<value>"(?:\\.|[^"\n])*"|\'(?:\\.|[^\'\n])*\'|[^\s"\',;&{}\[\]()]+)')
 STRUCTURE = frozenset({'role','type','id','name','model','tool_call_id','call_id','mime_type','media_type','tool_choice','finish_reason','continuationToken'})
 VALUE_KEYS = {'default','example','examples','const','value'}
+AUTH_KEYS = frozenset({'authorization', 'proxy-authorization'})
 MARKER = '[GUARD_WITHHELD]'
 JWT_MATERIAL = re.compile(r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?')
 COOKIE_HEADER = re.compile(r'(?im)^(?:Cookie|Set-Cookie)\s*:\s*[^\r\n]*[^\s=;]+=[^\s;]+')
@@ -105,6 +106,8 @@ class Guard:
         if len(heads)>512:return [(0,len(text),'SECRET')]
         for m in heads:
             name=unquote(unquote(m['name'])); kind=cred.classify_field(name)
+            auth=name.lower() in AUTH_KEYS
+            if auth:kind='SECRET'
             if not kind and re.search(r'(?i)(?:secret|credential)[_.-](?:blob|data|payload)$',name):kind='SECRET'
             if not kind and LABEL.fullmatch(name):kind='PII'
             if name.lower() in {'mongodb_uri','database_url','redis_url','connection_string'}:kind='SECRET'
@@ -124,13 +127,13 @@ class Guard:
                 # Reference exclusions apply only to an entire scalar, never
                 # a password prefix. Ambiguous punctuation stays hidden.
                 scalar=v.split()[0] if v.split() else ''
-                if scalar=='$' or scalar.startswith('${') or scalar.startswith('<your-'):continue
-                if scalar=='token,' or scalar=='token)':continue
-                if v.strip().lower() in cred._CODE_WORDS:continue
-                if cred._looks_like_reference(v.strip()) and '<HG:' not in v:continue
-                if (cred._DOTTED.fullmatch(v.strip()) or cred._SNAKE.fullmatch(v.strip())) and not any(c.isdigit() for c in v):continue
+                if not auth and (scalar=='$' or scalar.startswith('${') or scalar.startswith('<your-')):continue
+                if not auth and (scalar=='token,' or scalar=='token)'):continue
+                if not auth and v.strip().lower() in cred._CODE_WORDS:continue
+                if not auth and cred._looks_like_reference(v.strip()) and '<HG:' not in v:continue
+                if not auth and (cred._DOTTED.fullmatch(v.strip()) or cred._SNAKE.fullmatch(v.strip())) and not any(c.isdigit() for c in v):continue
                 if v.endswith('.') and LABEL.fullmatch(name):b-=1
-            if not v or cred._looks_like_reference(v):continue
+            if not v or (not auth and cred._looks_like_reference(v)):continue
             if kind=='PII' and name.lower()=='email' and not EMAIL.fullmatch(text[a:b]):kind='SECRET'
             add(a,b,kind)
         for m in re.finditer(r'(?i)(?:\bcurl\s+[^\n]*?-u\s+|\bmysql\s+[^\n]*?-p)([^\s]+)',text):add(*m.span(1),'SECRET')
@@ -211,6 +214,23 @@ class Guard:
             if key in STRUCTURE:
                 if self.spans(obj):return MARKER
                 return obj
+            # Credential headers are secrets even without a scheme or with a
+            # reference-looking value. Required controls_changed denies header
+            # rewriting rather than silently changing transport controls.
+            if key.lower() in AUTH_KEYS:
+                if obj in s.entries or not obj:return obj
+                return self.remember(s,obj,'SECRET')
+            # JSON text is still content. Walk decoded containers using the same
+            # bounded policy as real objects, including name/value indirection.
+            # Preserve benign JSON byte-for-byte, including whitespace.
+            if obj.lstrip().startswith(('{','[')):
+                try:
+                    parsed=json.loads(obj)
+                except (ValueError,TypeError,RecursionError):
+                    parsed=None
+                if isinstance(parsed,(dict,list)):
+                    masked=self.walk(parsed,s,key,depth+1)
+                    if masked != parsed:return json.dumps(masked,ensure_ascii=False)
             if key=='arguments':
                 try:return json.dumps(self.walk(json.loads(obj),s,depth=depth+1),ensure_ascii=False)
                 except (ValueError,TypeError):return self.text(obj,s)
@@ -224,7 +244,7 @@ class Guard:
             if obj.get('type') in {'image_url','input_image','image','audio','input_audio','file','input_file'}:
                 return {'type':'text','text':'[GUARD_WITHHELD_MEDIA: cover sensitive content locally]'}
             pair=obj.get('name')
-            return {k:self.walk(v,s,pair if k=='value' and isinstance(pair,str) and cred.classify_field(pair) else key if k in VALUE_KEYS and cred.classify_field(key) else k,depth+1) for k,v in obj.items() if isinstance(k,str)}
+            return {k:self.walk(v,s,pair if k=='value' and isinstance(pair,str) and (cred.classify_field(pair) or pair.lower() in AUTH_KEYS) else key if k in VALUE_KEYS and cred.classify_field(key) else k,depth+1) for k,v in obj.items() if isinstance(k,str)}
         if isinstance(obj,(list,tuple)):return [self.walk(v,s,key,depth+1) for v in obj]
         if obj is None or isinstance(obj,(bool,int,float)):return obj
         return MARKER  # SDK objects and bytes are never silently forwarded.

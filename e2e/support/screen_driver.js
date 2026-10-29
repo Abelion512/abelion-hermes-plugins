@@ -13,7 +13,8 @@ const sh = c => { try { return execSync(c, { stdio: 'pipe', env: { ...process.en
   pg.on('response', r => {
     const path = new URL(r.url()).pathname;
     if (r.status() >= 400 && (/\/api\/plugins\/screen\//.test(path) || /\/dashboard-plugins\/screen\//.test(path))) {
-      httpErrors.push({ path, status: r.status() });
+      // Capture only the non-secret profile selector, never auth tokens/tickets or the full URL.
+      httpErrors.push({ path, status: r.status(), profile: new URL(r.url()).searchParams.get('profile') });
     }
   });
   await pg.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); await sleep(3000);

@@ -157,7 +157,7 @@ jobs:
       - name: Install Bot Screen desktop dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tigervnc-standalone-server xdotool xfce4-terminal
+          sudo apt-get install -y --no-install-recommends tigervnc-standalone-server xdotool xfce4-panel xfwm4 xfdesktop4 xfce4-settings xfce4-terminal dbus-x11 x11-xserver-utils x11-utils x11-xkb-utils xauth fonts-dejavu-core
           if ! command -v Xvnc >/dev/null 2>&1; then
             xvnc="$(command -v Xtigervnc || true)"
             test -n "$xvnc" || { echo "Neither Xvnc nor Xtigervnc is available"; exit 1; }
@@ -166,6 +166,12 @@ jobs:
           command -v Xvnc
           command -v xdotool
           command -v xfce4-terminal
+          command -v xfwm4
+          command -v xfce4-panel
+          command -v xfdesktop
+          command -v xfsettingsd
+          command -v xdpyinfo
+          command -v xprop
       - name: Install pinned Hermes source and E2E dependencies
         run: |
           python -m pip install --upgrade pip

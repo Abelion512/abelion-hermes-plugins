@@ -192,6 +192,7 @@ jobs:
           unzip -q "$CHROME_ZIP" -d "$CHROME_ROOT"
           chrome="$CHROME_ROOT/chrome-linux64/chrome"
           test -x "$chrome"
+          export NODE_PATH="$E2E_NODE/node_modules"
           node -e "require('puppeteer-core')"
           echo "NODE_PATH=$E2E_NODE/node_modules" >> "$GITHUB_ENV"
           echo "SCREEN_E2E_CHROME=$chrome" >> "$GITHUB_ENV"

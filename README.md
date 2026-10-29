@@ -34,6 +34,14 @@ Bot Screen is for the agent's virtual desktop, not the user's personal display. 
 
 CI runs each plugin's own tests and dependency checks, plus a real-host E2E suite with a synthetic loopback provider, disposable profiles, and the exact core commit above. No real provider or production credentials are used. A green CI run is evidence for its tested commit and paths only.
 
+### Privacy regression strategy
+
+Keep both test layers. Unit tests exercise classifiers, boundaries, capacity, session isolation, and adversarial mutations quickly; E2E tests exercise the pinned Hermes host and inspect recorded provider requests plus delivered output. E2E does not replace unit coverage, and a green unit run alone is not proof of a secure provider boundary.
+
+The privacy suite includes a deterministic 256-case field-name mutation matrix and fail-closed checks for invisible Unicode in sensitive assignments. CI prints test counts in the run summary and continues to run the full real-host suite against a synthetic loopback provider.
+
+The “2.8T” target is not treated as a count of test cases or as a privacy guarantee. CI does **not** call a live 2.8-trillion-parameter model or send real PII/secrets to a remote endpoint. The current evidence is model-agnostic boundary testing: sensitive canaries must not appear in requests observed at the provider or in final user-visible output. Any live-model compatibility claim requires a separate explicitly configured evaluation and recorded evidence.
+
 ## Installation and migration
 
 `update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`; it does not migrate an installed profile, change its privacy settings, or remove old installed plugins. Review the target profile, stop the running Hermes process, back up its config and plugin versions, then use native plugin management for removals. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.

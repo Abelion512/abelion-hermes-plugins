@@ -30,6 +30,32 @@ MARKER = '[GUARD_WITHHELD]'
 JWT_MATERIAL = re.compile(r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?')
 COOKIE_HEADER = re.compile(r'(?im)^(?:Cookie|Set-Cookie)\s*:\s*[^\r\n]*[^\s=;]+=[^\s;]+')
 SESSION_ASSIGN = re.compile(r'(?im)^\s*(?:JSESSIONID|sessionid)\s*=\s*[^\s]+\s*$')
+# Zero-width and bidirectional formatting characters can make a sensitive field
+# visually match while evading an ASCII classifier. If one occurs inside a
+# sensitive assignment/name, fail closed rather than attempt index-unsafe repair.
+INVISIBLE_FORMAT = re.compile(r'[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]')
+OBFUSCATED_ASSIGN_HEAD = re.compile(
+    r'(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})[ \t]*(?:[:=]|%3[DdAa])[ \t]*'
+)
+
+
+def _invisible_sensitive_name(name):
+    if not INVISIBLE_FORMAT.search(name):
+        return False
+    normalized = INVISIBLE_FORMAT.sub('', name)
+    normalized = unquote(unquote(normalized))
+    return bool(cred.classify_field(normalized) or normalized.lower() in AUTH_KEYS or LABEL.fullmatch(normalized))
+
+
+def _has_obfuscated_sensitive_assignment(text):
+    if not INVISIBLE_FORMAT.search(text):
+        return False
+    normalized = INVISIBLE_FORMAT.sub('', text)
+    for match in OBFUSCATED_ASSIGN_HEAD.finditer(normalized):
+        name = unquote(unquote(match['name']))
+        if cred.classify_field(name) or name.lower() in AUTH_KEYS or LABEL.fullmatch(name):
+            return True
+    return False
 
 
 @dataclass(repr=False)
@@ -95,8 +121,9 @@ class Guard:
             from agent.redact import _PREFIX_RE
             for m in _PREFIX_RE.finditer(text): add(*m.span(),'SECRET')
         except ImportError: pass
-        for m in re.finditer(r'--(?P<name>[A-Za-z][A-Za-z0-9_.-]{1,100})[ =](?P<value>"[^"\n]*"|\'[^\'\n]*\'|[^\s"\',;&<>{}\[\]()]+)',text):
-            if cred.classify_field(m["name"].lstrip("-")):
+        for m in re.finditer(r'--(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})[ =](?P<value>"[^"\n]*"|\'[^\'\n]*\'|[^\s"\',;&<>{}\[\]()]+)',text):
+            name=unquote(unquote(m["name"].lstrip("-")))
+            if cred.classify_field(name) or name.lower() in AUTH_KEYS or LABEL.fullmatch(name):
                 a,b=m.span("value");v=m["value"]
                 if v[:1] in ("\"", "'"):a+=1;b-=1
                 add(a,b,"SECRET")
@@ -172,9 +199,33 @@ class Guard:
         return merged
 
     def text(self,text,s):
+        # Obfuscated sensitive labels are ambiguous by design: hide the whole value
+        # rather than risk an incorrect span replacement or a partial leak.
+        if _has_obfuscated_sensitive_assignment(text):return MARKER
         # Exact registered literals are masked even when the surrounding label is absent.
         # Placeholder-looking user input never creates a mapping.
         if len(text)>131_072:return MARKER
+        # A prompt may mix prose with standalone JSON lines. Whole-string json.loads()
+        # misses those lines, while regex-only scanning can miss nested name/value pairs.
+        # Walk valid JSON lines structurally and replace only lines whose decoded value changes.
+        if "\n" in text:
+            rebuilt=[]
+            changed=False
+            for line in text.splitlines(keepends=True):
+                body=line.rstrip("\r\n")
+                ending=line[len(body):]
+                if body.lstrip().startswith(("{","[")):
+                    try:
+                        parsed=json.loads(body)
+                    except (ValueError,TypeError,RecursionError):
+                        parsed=None
+                    if isinstance(parsed,(dict,list)):
+                        masked=self.walk(parsed,s,depth=1)
+                        if masked != parsed:
+                            body=json.dumps(masked,ensure_ascii=False)
+                            changed=True
+                rebuilt.append(body+ending)
+            if changed:text="".join(rebuilt)
         low=text.lower()
         if text.count('@')>256 or low.count('bearer')+low.count('basic')>256:return MARKER
         if re.search(r'<HG:',text,re.I) and any(m[0] not in s.entries for m in TOKEN.finditer(text)):
@@ -253,7 +304,7 @@ class Guard:
                 if obj and not cred._looks_like_reference(obj):return self.remember(s,obj,kind or ('SECRET' if key.lower() in {'mongodb_uri','database_url','redis_url','connection_string'} else 'PII'))
             return self.text(obj,s)
         if isinstance(obj,dict):
-            if any(not isinstance(k,str) or self.spans(k) for k in obj):
+            if any(not isinstance(k,str) or self.spans(k) or _invisible_sensitive_name(k) for k in obj):
                 return MARKER
             if obj.get('type') in {'image_url','input_image','image','audio','input_audio','file','input_file'}:
                 return {'type':'text','text':'[GUARD_WITHHELD_MEDIA: cover sensitive content locally]'}

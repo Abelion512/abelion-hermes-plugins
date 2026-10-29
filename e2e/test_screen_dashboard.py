@@ -42,14 +42,17 @@ def flow(tmp_path_factory):
     (h / "config.yaml").write_text(cfg)
     env = hermetic_env(home)
     preflight_code = r'''
-import json
+import json, logging, re
+logging.basicConfig(level=logging.DEBUG)
 from hermes_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
 from hermes_cli.web_server_dashboard import _discover_dashboard_plugins, _plugin_api_mount_skip_reason, _plugin_api_mounted
-from hermes_cli.web_server import app
+from hermes_cli.web_server import app, _get_dashboard_plugins
 from hermes_cli.plugin_isolation import isolation_mode
 enabled, disabled = _get_enabled_set(), _get_disabled_set()
 plugins = _discover_dashboard_plugins()
+server_plugins = _get_dashboard_plugins(force_rescan=True)
 screen = [p for p in plugins if p.get("name") == "screen"]
+server_screen = [p for p in server_plugins if p.get("name") == "screen"]
 routes = [getattr(route, "path", "") for route in app.routes if "/api/plugins/screen" in getattr(route, "path", "")]
 print(json.dumps({
     "enabled": sorted(enabled),
@@ -61,6 +64,11 @@ print(json.dumps({
         "dir_exists": bool(p.get("_dir") and __import__("pathlib").Path(p["_dir"]).is_dir()),
         "skip_reason": _plugin_api_mount_skip_reason(p, enabled, disabled),
     } for p in screen],
+    "server_screen": [{
+        "source": p.get("source"),
+        "api_file": p.get("_api_file"),
+        "dir": p.get("_dir"),
+    } for p in server_screen],
     "api_mounted": _plugin_api_mounted(app, "screen"),
     "api_routes": routes,
 }, sort_keys=True))
@@ -72,6 +80,11 @@ print(json.dumps({
     if preflight.returncode:
         pytest.fail("Screen API preflight command failed: " + preflight.stderr[-2000:])
     print("SCREEN E2E plugin API preflight: " + preflight.stdout.strip())
+    if preflight.stderr:
+        relevant = [line for line in preflight.stderr.splitlines()
+                    if re.search(r"plugin|screen|api|import|module|error|exception|traceback", line, re.I)]
+        if relevant:
+            print("SCREEN E2E preflight diagnostics:\\n" + "\\n".join(relevant[-50:]))
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     dashboard_log = tmp / "dashboard.log"
     with dashboard_log.open("w", encoding="utf-8") as log:

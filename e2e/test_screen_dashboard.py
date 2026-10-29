@@ -44,19 +44,25 @@ def flow(tmp_path_factory):
     preflight_code = r'''
 import json
 from hermes_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
-from hermes_cli.web_server_dashboard import _discover_dashboard_plugins, _plugin_api_mount_skip_reason
+from hermes_cli.web_server_dashboard import _discover_dashboard_plugins, _plugin_api_mount_skip_reason, _plugin_api_mounted
+from hermes_cli.web_server import app
+from hermes_cli.plugin_isolation import isolation_mode
 enabled, disabled = _get_enabled_set(), _get_disabled_set()
 plugins = _discover_dashboard_plugins()
 screen = [p for p in plugins if p.get("name") == "screen"]
+routes = [getattr(route, "path", "") for route in app.routes if "/api/plugins/screen" in getattr(route, "path", "")]
 print(json.dumps({
     "enabled": sorted(enabled),
     "disabled": sorted(disabled),
+    "isolation": isolation_mode(),
     "screen": [{
         "source": p.get("source"),
         "api_file": p.get("_api_file"),
         "dir_exists": bool(p.get("_dir") and __import__("pathlib").Path(p["_dir"]).is_dir()),
         "skip_reason": _plugin_api_mount_skip_reason(p, enabled, disabled),
     } for p in screen],
+    "api_mounted": _plugin_api_mounted(app, "screen"),
+    "api_routes": routes,
 }, sort_keys=True))
 '''
     preflight = subprocess.run(

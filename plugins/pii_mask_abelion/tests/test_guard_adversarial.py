@@ -159,3 +159,21 @@ def test_benign_docs_and_public_urls_remain_unchanged():
         "request", request=request_for(benign), session_id="benign-docs"
     )
     assert result == {"allow": True, "request": request_for(benign)}
+
+
+def test_json_sensitive_pair_embedded_in_mixed_text_is_masked():
+    secret = "SyntheticMixedJsonCanaryN8q4V2"
+    mixed = "\n".join([
+        "Please inspect this harmless preface.",
+        json.dumps({"name": "HF_TOKEN", "value": secret, "note": "benign-retained"}),
+        "Keep this harmless suffix unchanged.",
+    ])
+    result = Guard().required_policy(
+        "request", request=request_for(mixed), session_id="mixed-json-line"
+    )
+    assert result.get("allow") is True, result
+    wire = decision_json(result)
+    assert secret not in wire
+    assert "Please inspect this harmless preface." in wire
+    assert "Keep this harmless suffix unchanged." in wire
+    assert "benign-retained" in wire

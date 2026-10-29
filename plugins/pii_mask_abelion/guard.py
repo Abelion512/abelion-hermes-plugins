@@ -205,6 +205,27 @@ class Guard:
         # Exact registered literals are masked even when the surrounding label is absent.
         # Placeholder-looking user input never creates a mapping.
         if len(text)>131_072:return MARKER
+        # A prompt may mix prose with standalone JSON lines. Whole-string json.loads()
+        # misses those lines, while regex-only scanning can miss nested name/value pairs.
+        # Walk valid JSON lines structurally and replace only lines whose decoded value changes.
+        if "\n" in text:
+            rebuilt=[]
+            changed=False
+            for line in text.splitlines(keepends=True):
+                body=line.rstrip("\r\n")
+                ending=line[len(body):]
+                if body.lstrip().startswith(("{","[")):
+                    try:
+                        parsed=json.loads(body)
+                    except (ValueError,TypeError,RecursionError):
+                        parsed=None
+                    if isinstance(parsed,(dict,list)):
+                        masked=self.walk(parsed,s,depth=1)
+                        if masked != parsed:
+                            body=json.dumps(masked,ensure_ascii=False)
+                            changed=True
+                rebuilt.append(body+ending)
+            if changed:text="".join(rebuilt)
         low=text.lower()
         if text.count('@')>256 or low.count('bearer')+low.count('basic')>256:return MARKER
         if re.search(r'<HG:',text,re.I) and any(m[0] not in s.entries for m in TOKEN.finditer(text)):

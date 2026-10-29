@@ -85,7 +85,11 @@ jobs:
       - name: syntax check
         env:
           P: ${{ matrix.plugin }}
-        run: python -m compileall -q "$P"
+        run: |
+          python -m compileall -q "$P"
+          if [ "$P" = screen ]; then
+            bash -n screen/install.sh screen/uninstall.sh
+          fi
       - name: tests
         env:
           P: ${{ matrix.plugin }}

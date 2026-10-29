@@ -7,17 +7,20 @@ import pytest
 from pii_mask_abelion.guard import Guard, MARKER, TOKEN
 from pii_mask_abelion import register
 
-ROOT=Path(__file__).resolve().parents[2]
+REPO_ROOT=Path(__file__).resolve().parents[3]
+PLUGINS_ROOT=REPO_ROOT/'plugins'
 
 
-def test_exactly_three_independent_manifests_and_catalog_entries():
-    manifests=list(ROOT.rglob('plugin.yaml'))
-    assert len(manifests)==3
-    catalog=json.loads((ROOT/'hermes.json').read_text())['plugins']
-    assert len(catalog)==2  # 9router code kept but disabled (not in catalog)
+def test_exactly_two_active_plugin_manifests_and_catalog_entries():
+    manifests=list(PLUGINS_ROOT.rglob('plugin.yaml'))
+    assert len(manifests)==2
+    catalog=json.loads((REPO_ROOT/'hermes.json').read_text())['plugins']
+    assert len(catalog)==2
+    assert {p['id'] for p in catalog}=={'pii-mask-abelion','screen'}
     assert 'output-redact-abelion' not in {p['id'] for p in catalog}
     assert 'pii-mask-abelion' in {p['id'] for p in catalog}
-    assert not (ROOT/'output_redact_abelion').exists()
+    assert not (PLUGINS_ROOT/'output_redact_abelion').exists()
+    assert not (REPO_ROOT/'model-providers'/'9router').exists()
 
 
 def test_one_output_hook_and_one_required_policy_owner():

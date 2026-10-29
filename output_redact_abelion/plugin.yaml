@@ -1,9 +1,0 @@
-name: output-redact-abelion
-description: "transform_llm_output: redact credentials from AI response before delivery."
-version: 1.0.0
-author: Abelion
-kind: general
-metadata:
-  hermes:
-    category: security
-    tags: [output, redact, security, credentials]

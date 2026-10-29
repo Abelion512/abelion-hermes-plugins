@@ -37,6 +37,7 @@ import time
 import json
 import logging
 import os
+from urllib.parse import urlsplit
 
 import aiohttp
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -47,7 +48,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 BUILD = "screen-plugin v0.6.3-20261026"
-MAX_WS_FRAME = 64 * 1024 * 1024
+MAX_WS_FRAME = 16 * 1024 * 1024
 ALLOWED_RPC = ("display.observe", "display.status",
                "display.lease.acquire", "display.lease.release")
 
@@ -62,18 +63,45 @@ class UpstreamError(Exception):
         self.hint = hint
 
 
+def _test_upstream_override() -> str | None:
+    """Allow a loopback-only upstream override inside explicit test runs only."""
+    if os.environ.get("HERMES_SCREEN_TEST_MODE") != "1":
+        return None
+    raw = os.environ.get("HERMES_SCREEN_UPSTREAM", "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = urlsplit(raw)
+        port = parsed.port
+    except ValueError as exc:
+        raise UpstreamError(None, "invalid test-only upstream URL") from exc
+    if (
+        parsed.scheme != "ws"
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or port is None
+        or not 1 <= port <= 65535
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise UpstreamError(None, "test-only upstream must be a loopback ws URL")
+    return raw.rstrip("/")
+
+
 def _upstream_base(request: Request) -> str:
-    override = os.environ.get("HERMES_SCREEN_UPSTREAM", "").strip()
+    override = _test_upstream_override()
     if override:
-        return override.rstrip("/")
+        return override
     port = getattr(request.app.state, "bound_port", None) or 9119
     return f"ws://127.0.0.1:{port}"
 
 
 async def _upstream_credential(base_ws: str) -> str:
     """Query-string credential for OUR server-spawned client connection."""
-    if os.environ.get("HERMES_SCREEN_UPSTREAM", "").strip():
-        # Test harness: the mock injects the same bootstrap token in its /.
+    if _test_upstream_override() == base_ws:
+        # Test harness: a loopback-only fixture injects a synthetic session token.
         return "token", await _scrape_session_token("http" + base_ws[2:])
     from hermes_cli.web_server import app
     if getattr(app.state, "auth_required", False):
@@ -307,12 +335,18 @@ async def lease(request: Request, action: str):
     # Hermes Desktop, the phone) - the plugin cannot tell them apart, so a
     # generic Hand back must never escalate on its own.
     force = False
-    if action == "release":
-        try:
-            body = await request.json()
-        except Exception:
-            body = None
-        force = isinstance(body, dict) and body.get("force") is True
+    raw=await request.body()
+    if raw:
+        try:body=json.loads(raw)
+        except (ValueError,UnicodeError):
+            return JSONResponse({"ok":False,"error":"invalid_json"},status_code=422)
+        if not isinstance(body,dict) or set(body)-{"force"}:
+            return JSONResponse({"ok":False,"error":"unsupported_lease_fields"},status_code=422)
+        if "force" in body and type(body["force"]) is not bool:
+            return JSONResponse({"ok":False,"error":"force_must_be_boolean"},status_code=422)
+        force=body.get("force",False)
+        if force and action!="release":
+            return JSONResponse({"ok":False,"error":"force_only_for_release"},status_code=422)
     # If the live connection never minted our id (reconnect), re-observe
     # first: that also refreshes ticket + identity.
     if _rpc is not None and _viewer_id not in _rpc.minted_ids:
@@ -361,19 +395,18 @@ async def lease(request: Request, action: str):
 # --- RFB splice (ticket stays server-side) ------------------------------------
 
 def _ws_upgrade_authorized(ws: WebSocket) -> bool:
-    """Gate on the dashboard's canonical WS auth (web_server_chat._ws_auth_ok)
-    so this endpoint can never drift from core auth. Fails CLOSED when the
-    core module is unavailable."""
+    """Use the canonical dashboard WS auth gate. Any missing/broken gate denies."""
     try:
         from hermes_cli import web_server_chat as _ws
-    except Exception:
-        # FAIL CLOSED: this check is the ONLY gate on the display WebSocket
-        # (HTTP middleware does not run for WS upgrades). If the core module
-        # cannot be imported - e.g. a Hermes update renames it - deny, never
-        # silently open. The test harness injects a stub hermes_cli instead.
-        log.warning("screen: core WS auth module unavailable; denying upgrade")
+        check = getattr(_ws, "_ws_auth_ok", None)
+        if not callable(check):
+            raise RuntimeError("canonical websocket auth check is unavailable")
+        return bool(check(ws))
+    except Exception as exc:
+        # WS upgrades do not pass through the ordinary HTTP middleware.
+        # Missing symbols and internal auth errors must never open this route.
+        log.warning("screen: canonical WS auth failed; denying upgrade (%s)", type(exc).__name__)
         return False
-    return bool(_ws._ws_auth_ok(ws))
 
 
 @router.get("/display/last_close")

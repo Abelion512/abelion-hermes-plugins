@@ -1,11 +1,10 @@
 """Shared credential detection patterns — single source of truth.
 
 Digunakan oleh:
-- output_redact_abelion (transform_llm_output hook)
+- pii_mask_abelion.output_redact (held final-output stage)
 - pii_mask_abelion (llm_request middleware)
 
-Jika menambah pattern baru, update FILE INI di kedua direktori.
-Lihat juga: pii_mask_abelion/_patterns.py (identical copy).
+This consolidated plugin uses this one local pattern module.
 """
 
 from __future__ import annotations
@@ -43,4 +42,14 @@ PAREN_CRED_RE = re.compile(
     r")\s*"
     r"\))",
     re.IGNORECASE | re.VERBOSE,
+)
+
+
+# Cheap pre-filter: PAREN_CRED_RE can only match when a "(label)" annotation exists.
+# Running this first avoids the leading \S+(?:\s+\S+){0,5}? backtracking on text without one.
+PAREN_LABEL_RE = re.compile(
+    r"\(\s*(?:app[ _-]?(?:email|pass)|pass[ _-]?email|client[ _-]?(?:id|secret)"
+    r"|api[ _-]?(?:key|secret)|auth|webhook[ _-]?secret|sudo[ _-]?password"
+    r"|password|pass|pw|secret|credential|token|apikey|email|user|apppass)",
+    re.IGNORECASE,
 )

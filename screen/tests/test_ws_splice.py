@@ -62,7 +62,7 @@ def test_ws_auth_fails_closed_without_core_module(plugin, monkeypatch):
         pass
 
 
-def test_splice_echo_and_clean_close(plugin, mock):
+def test_splice_echo_and_clean_close(plugin, upstream):
     _observe(plugin)
     ws = websocket.create_connection(_ws_url(plugin), timeout=5)
     ws.send_binary(b"\x01\x02\x03")
@@ -70,7 +70,7 @@ def test_splice_echo_and_clean_close(plugin, mock):
     ws.close()  # polite -> splice mirrors a CLEAN close upstream
     import time
     time.sleep(0.5)
-    assert "clean" in mock.display_conns.values(), mock.display_conns
+    assert "clean" in upstream.display_conns.values(), upstream.display_conns
 
 
 def _close_code(ws):
@@ -92,7 +92,7 @@ def test_no_ticket_close_is_readable_4409(plugin):
     assert "observe" in reason
 
 
-def test_ticket_is_single_use_per_observe(plugin, mock):
+def test_ticket_is_single_use_per_observe(plugin, upstream):
     """Regression (v0.4): a second ws without a fresh /observe must NOT ride
     the previous ticket (two tabs / rapid double refresh raced on it)."""
     _observe(plugin)
@@ -105,18 +105,18 @@ def test_ticket_is_single_use_per_observe(plugin, mock):
     ws1.close()
 
 
-def test_upstream_close_code_forwarded_and_recorded(plugin, mock):
+def test_upstream_close_code_forwarded_and_recorded(plugin, upstream):
     """Regression (v0.4): an upstream refusal (e.g. 4401 ticket already
     consumed) must reach the tab as 4401 - v0.3 proxied every upstream
     failure as a bare 1000 - and /display/last_close must explain it."""
-    mock.close_display_with = 4401
+    upstream.close_display_with = 4401
     try:
         _observe(plugin)
         ws = websocket.create_connection(_ws_url(plugin), timeout=5)
         code, reason = _close_code(ws)
         assert code == 4401, code
     finally:
-        mock.close_display_with = None
+        upstream.close_display_with = None
     import httpx as _h, time as _t
     _t.sleep(0.3)
     j = _h.get(f"{plugin.base_http}/api/plugins/screen/display/last_close",

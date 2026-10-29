@@ -5,7 +5,7 @@ Masks sensitive content BEFORE it reaches the provider.
 
 Levels (from research briefs):
   PUBLIC      → no mask, route any provider
-  INTERNAL    → mask internal keywords (company, proprietary)
+  INTERNAL    → classify internal keywords only; no prose-wide masking policy
   CONFIDENTIAL → mask secrets, PII, API keys
 
 Detection: regex + keyword heuristics (zero LLM cost).
@@ -17,10 +17,10 @@ from __future__ import annotations
 import json
 import logging
 import re
-from copy import deepcopy
 from typing import Any, Optional
 
-from ._patterns import PAREN_CRED_RE
+from ._credentials import classify_field, mask_credentials, mask_value_for_key
+from ._patterns import PAREN_CRED_RE, PAREN_LABEL_RE
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,10 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)(?:sk|pk)-[a-z0-9]{4,}'), "OPENAI_KEY"),
     # GitHub tokens
     (re.compile(r'(?i)ghp_[a-z0-9]{8,}|gho_[a-z0-9]{8,}|ghu_[a-z0-9]{8,}'), "GITHUB_TOKEN"),
-    # Environment variable patterns (KEY=value)
-    (re.compile(r'(?i)(api[_-]?key|apikey|secret|token|password)\s*[:=]\s*["\']?[a-z0-9_\-]{8,}["\']?'), "SECRET_CRED"),
+    # KEY=value assignments are handled by mask_credentials (value only, field name kept)
     # Bare secret values (long alphanumeric preceded by "secret", "token", "password" or similar)
-    (re.compile(r'(?i)\bsecret[a-z0-9_\-]{8,}\b|GITHUB_TOKEN|SUPER_SECRET|supersecret'), "BARE_SECRET"),
-    # .env style (whole line)
-    (re.compile(r'^\s*(?:export\s+)?(?:\w+)_(?:API_KEY|TOKEN|PASSWORD|SECRET)\s*[:=].+', re.MULTILINE), "ENV_ENTRY"),
+    (re.compile(r'(?i)\bsecret(?=[a-z_\-]*\d)[a-z0-9_\-]{8,}\b|supersecret'), "BARE_SECRET"),
+    # .env style lines are handled by mask_credentials (value only, field name kept)
     # Prose credential annotations: ``value (password)``, ``user (username)``
     # Catches credentials labeled in free-form prose before reaching provider.
     # Pattern imported from _patterns.py (shared with output_redact_abelion).
@@ -55,6 +53,9 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)https?://[^@\s]+:[^@\s]+@'), "URL_WITH_CREDS"),
     # Private keys
     (re.compile(r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----'), "PRIVATE_KEY"),
+    # Complete PII values, before the legacy field matcher can consume a prefix.
+    (re.compile(r'(?<![\w.+-])[\w.+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}'), "EMAIL"),
+    (re.compile(r'(?<![\w\d])(?:\+62|62|08)[\d -]{7,16}\d(?!\d)'), "PHONE"),
     # PII patterns (Indonesia-specific KTP/NIK/NPWP)
     (re.compile(r'\b\d{16,19}\b'), "LONG_NUMBER"),
     (re.compile(r'(?i)\b(email|phone|address|ssn|kks|nik|ktp|npwp)\s*[:=]\s*["\']?\w+'), "PII_FIELD"),
@@ -87,6 +88,8 @@ def classify_content(text: str) -> str:
 
     # Check CONFIDENTIAL first (highest priority)
     for pattern, _ in SECRET_PATTERNS:
+        if pattern is PAREN_CRED_RE and not PAREN_LABEL_RE.search(text):
+            continue
         if pattern.search(text):
             return CONFIDENTIAL
 
@@ -104,10 +107,12 @@ def mask_content(text: str, mask_char: str = "[REDACTED]") -> str:
 
     Returns (masked_text, changes) where changes is a count of replacements.
     """
-    changes = 0
-    result = text
+    # Credential names/values first: keeps the field name and masks only the value.
+    result, changes = mask_credentials(text)
 
     for pattern, label in SECRET_PATTERNS:
+        if pattern is PAREN_CRED_RE and not PAREN_LABEL_RE.search(result):
+            continue
         new_result, count = pattern.subn(
             lambda m: _mask_match(m, label, mask_char), result
         )
@@ -125,61 +130,139 @@ def _mask_match(match: re.Match, label: str, mask_char: str) -> str:
 
 # ── Middleware ─────────────────────────────────────────────────────────
 
+# String values under these keys are structure, not content: never rewritten.
+_SKIP_KEYS = frozenset({
+    "role", "type", "id", "name", "model", "tool_call_id", "call_id", "tool_use_id", "mime_type",
+    "media_type", "finish_reason", "tool_choice",
+})
+# Binary payloads: opaque, left alone (a known gap: secrets inside images/audio are not inspected).
+_BINARY_KEYS = frozenset({"data", "b64_json", "file_data", "audio", "bytes", "signature", "encrypted_content"})
+_VALUE_KEYS = frozenset({"default", "example", "examples", "const", "value"})
+_B64 = re.compile(r"[A-Za-z0-9+/=_\-]{128,}")
+
+
+def _mask_json_string(text: str):
+    """Tool-call ``arguments`` are JSON text: mask the string leaves so the JSON stays valid."""
+    try:
+        parsed = json.loads(text)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(parsed, (dict, list)):
+        return None
+    new, count = _mask_obj(parsed)
+    if count == 0:
+        return text, 0
+    return json.dumps(new, ensure_ascii=False), count
+
+
+_MAX_DEPTH = 64
+_UNSUPPORTED = "[REDACTED]_UNSUPPORTED_STRUCTURE"
+
+
+def _mask_deep(value: Any, key: str):
+    """Subtree nested deeper than _MAX_DEPTH (or cyclic): mask through a JSON round trip.
+
+    Keeps dict/list shape and the valid-JSON contract providers need. A subtree that cannot be
+    serialised at all (cyclic) could not be sent as JSON either, so it is replaced, never forwarded raw.
+    """
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+        masked, _ = mask_content(text)
+        return json.loads(masked), 1
+    except (ValueError, TypeError, RecursionError, OverflowError):
+        return _UNSUPPORTED, 1
+
+
+def _mask_obj(value: Any, key: str = "", depth: int = 0):
+    """Copy-on-write walk: returns (value, masked_count); unchanged objects are returned as is."""
+    if depth > _MAX_DEPTH and isinstance(value, (dict, list, tuple)):
+        return _mask_deep(value, key)
+    if isinstance(value, str):
+        if not value or key in _SKIP_KEYS or value.startswith("data:"):
+            return value, 0
+        if key in _BINARY_KEYS and _B64.fullmatch(value):
+            return value, 0
+        if key == "arguments" and value[:1] in "{[":
+            res = _mask_json_string(value)
+            if res is not None:
+                return res
+        if key:
+            new, count = mask_value_for_key(key, value)
+            if count:
+                return new, count
+        try:
+            masked, count = mask_content(value)
+        except Exception:  # never let one string abort masking, and never pass it on unmasked
+            logger.warning("[PII] masking failed for a string; replaced it", exc_info=True)
+            return "[REDACTED]_MASK_ERROR", 1
+        return (masked, count) if count else (value, 0)
+    if isinstance(value, dict):
+        out = None
+        total = 0
+        pair = value.get("name") if isinstance(value.get("name"), str) else None
+        for k, v in value.items():
+            if not isinstance(k, str):
+                continue
+            # {"name": "HF_TOKEN", "value": "..."} style entries: classify by the name.
+            if pair is not None and k == "value" and isinstance(v, str) and classify_field(pair):
+                new, count = mask_value_for_key(pair, v)
+            else:
+                # {"api_key": {"default": "..."}}: the value inherits the credential field name.
+                new, count = _mask_obj(v, key if k in _VALUE_KEYS and key and classify_field(key) else k, depth + 1)
+            if count:
+                if out is None:
+                    out = dict(value)
+                out[k] = new
+                total += count
+        return (out, total) if out is not None else (value, 0)
+    if isinstance(value, (list, tuple)):
+        out = None
+        total = 0
+        for i, v in enumerate(value):
+            new, count = _mask_obj(v, key, depth + 1)
+            if count:
+                if out is None:
+                    out = list(value)
+                out[i] = new
+                total += count
+        if out is None:
+            return value, 0
+        return (tuple(out) if isinstance(value, tuple) else out), total
+    return value, 0
+
+
 def pii_middleware(
     request: dict[str, Any],
     original_request: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any] | None:
-    """LLM request middleware: mask PII in messages before provider.
+    """LLM request middleware: mask PII and credentials in the outgoing request.
+
+    Walks the WHOLE request (messages, tool-call arguments, system/instructions/input and
+    other provider-specific fields), not just ``messages[].content``. Tool schemas are walked too (descriptions, defaults, examples) but only string values change. Ids,
+    roles, model names and opaque base64 payloads are left alone. Copy-on-write: the caller's
+    request is never mutated.
 
     Register via ctx.register_middleware("llm_request", pii_middleware).
     Returns {"request": new_request} if changes made, None otherwise.
     """
-    messages = request.get("messages", [])
-    if not messages:
+    if not isinstance(request, dict) or not request:
         return None
-
-    changed = False
-    new_request = deepcopy(request)
-    new_messages = new_request.get("messages", [])
-
-    total_masked = 0
-    sensitivity = PUBLIC
-
-    for msg in new_messages:
-        content = msg.get("content", "")
-        if isinstance(content, list):
-            # Multi-part content (tool results, images, etc.)
-            for part in content:
-                if part.get("type") == "text":
-                    text = part.get("text", "")
-                    masked, count = mask_content(text)
-                    if count > 0:
-                        part["text"] = masked
-                        total_masked += count
-                        changed = True
-        elif isinstance(content, str):
-            masked, count = mask_content(content)
-            if count > 0:
-                msg["content"] = masked
-                total_masked += count
-                changed = True
-
-        # Track highest sensitivity found
-        level = classify_content(str(content))
-        if level == CONFIDENTIAL:
-            sensitivity = CONFIDENTIAL
-        elif level == INTERNAL and sensitivity != CONFIDENTIAL:
-            sensitivity = INTERNAL
-
-    if changed:
-        logger.info(
-            "[PII] Masked %d items in request (level=%s)",
-            total_masked, sensitivity,
-        )
-        return {"request": new_request}
-
-    return None
+    try:
+        new_request, total_masked = _mask_obj(request)
+    except Exception:
+        # Last resort (a container whose iteration raises, ...): mask through a JSON round trip,
+        # which keeps shape but turns non-JSON objects into strings. The host would otherwise send
+        # the original, so a changed type is the lesser risk.
+        logger.error("[PII] request walk failed; masking via JSON round trip", exc_info=True)
+        fallback, _ = _mask_deep(request, "")
+        if isinstance(fallback, dict):
+            return {"request": fallback}
+        return None
+    if total_masked == 0:
+        return None
+    logger.info("[PII] Masked %d items in request (level=%s)", total_masked, CONFIDENTIAL)
+    return {"request": new_request}
 
 
 # ── Standalone scan (stateless, for testing) ───────────────────────────

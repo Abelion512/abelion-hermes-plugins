@@ -16,14 +16,13 @@ cd "$REPO"
 git pull --ff-only
 
 echo "⟳ Syncing to $PLUGIN_DIR..."
-for d in shield_abelion pii_mask_abelion output_redact_abelion tool_context_abelion rsi_learn_abelion screen; do
+for d in pii_mask_abelion screen; do
   rsync -a --delete "$d/" "$PLUGIN_DIR/$d/"
   echo "  ✅ $d"
 done
 
-mkdir -p "$PLUGIN_DIR/model-providers"
-rsync -a --delete model-providers/9router/ "$PLUGIN_DIR/model-providers/9router/"
-echo "  ✅ model-providers/9router"
+# 9Router Catalog is disabled: not synced. Code stays in model-providers/9router.
+# An already installed copy is left untouched; remove it yourself if wanted.
 
 echo ""
 echo "✅ Plugins updated. Restart gateway:"

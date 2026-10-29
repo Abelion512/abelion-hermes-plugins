@@ -84,8 +84,8 @@ def test_adversarial_mixed_input_forms_are_absent_from_every_provider_request(tm
     """Exercise the whole host path with varied synthetic values and serializations."""
     opaque = "SyntheticWireCanaryOmegaZ9x7Q5v3"
     json_value = "SyntheticJsonCanaryR8m6N4p2"
-    auth_value = "SyntheticHeaderCanaryW4c8K2m6"
-    url_secret = "SyntheticUrlSecretV4n8Q2"
+    auth_value = "SyntheticHeaderCanaryW4c8K2m6"  # gitleaks:allow (synthetic privacy test canary)
+    url_secret = "SyntheticUrlSecretV4n8Q2"  # gitleaks:allow (synthetic privacy test canary)
     prompt = "\n".join([
         f"OPENAI_API_KEY={PRIVATE['credential']}",
         f"api%5Fkey={opaque}",

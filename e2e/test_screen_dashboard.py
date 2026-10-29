@@ -83,7 +83,24 @@ def flow(tmp_path_factory, request):
         )
         time.sleep(4)
         r = run()
-        yield json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"error": r.stderr[-300:]}
+        payload = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"error": r.stderr[-300:]}
+        steps = payload.get("steps", {})
+        if not steps.get("api_build_probe", {}).get("ok", True) or payload.get("http_errors"):
+            # Print during fixture setup so Pytest attaches this evidence to call-phase failures.
+            print("SCREEN E2E API diagnostics: " + json.dumps({
+                "api_build_probe": steps.get("api_build_probe"),
+                "http_errors": payload.get("http_errors", []),
+            }, sort_keys=True))
+            try:
+                log_lines = dashboard_log.read_text(encoding="utf-8", errors="replace").splitlines()
+                needles = ("Plugin screen", "plugin screen", "Failed to load plugin", "plugin API",
+                           "Plugin not found", "refusing unsafe api", "skipping API mount",
+                           "plugins.enabled", "not in plugins.enabled", "Mounted plugin API routes")
+                selected = [line for line in log_lines if any(term in line for term in needles)]
+                print("SCREEN dashboard backend diagnostics:\\n" + "\\n".join(selected[-60:]))
+            except Exception as exc:
+                print("SCREEN dashboard diagnostics unavailable: " + type(exc).__name__)
+        yield payload
     finally:
         if request.session.testsfailed:
             try:

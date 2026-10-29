@@ -8,9 +8,30 @@ const sh = c => { try { return execSync(c, { stdio: 'pipe', env: { ...process.en
 (async () => {
   const b = await p.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox', '--disable-gpu', '--window-size=1440,900'] });
   const pg = await b.newPage(); await pg.setViewport({ width: 1440, height: 900 });
-  const errs = []; pg.on('pageerror', e => errs.push(String(e)));
+  const errs = [], httpErrors = [];
+  pg.on('pageerror', e => errs.push(String(e)));
+  pg.on('response', r => {
+    const path = new URL(r.url()).pathname;
+    if (r.status() >= 400 && (/\/api\/plugins\/screen\//.test(path) || /\/dashboard-plugins\/screen\//.test(path))) {
+      httpErrors.push({ path, status: r.status() });
+    }
+  });
   await pg.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); await sleep(3000);
-  const out = { steps: {}, pageerrors: errs };
+  const out = { steps: {}, pageerrors: errs, http_errors: httpErrors };
+  try {
+    out.steps.api_build_probe = await pg.evaluate(async () => {
+      const sdk = window.__HERMES_PLUGIN_SDK__;
+      if (!sdk || typeof sdk.fetchJSON !== 'function') return { ok: false, message: 'plugin SDK unavailable' };
+      try {
+        const result = await sdk.fetchJSON('/api/plugins/screen/build');
+        return { ok: true, build: result.build };
+      } catch (e) {
+        return { ok: false, message: String(e && e.message || e) };
+      }
+    });
+  } catch (e) {
+    out.steps.api_build_probe = { ok: false, message: String(e) };
+  }
   const click = t => pg.evaluate(t => { const x = [...document.querySelectorAll('button')].find(b => b.textContent.trim().toLowerCase().startsWith(t)); if (x) x.click(); return !!x; }, t);
   const lease = () => pg.evaluate(() => { const m = document.body.innerText.match(/lease: (\w+)/); return m ? m[1] : null; });
   const typeIt = async name => {

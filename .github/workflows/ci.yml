@@ -122,7 +122,7 @@ jobs:
                       f"{counts['failures']} failures, {counts['errors']} errors, "
                       f"{counts['skipped']} skipped.")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write(line + "\\n")
+              summary.write(line + "\n")
           PY
       - name: dependency audit
         env:
@@ -281,7 +281,7 @@ jobs:
                       f"{counts['failures']} failures, {counts['errors']} errors, "
                       f"{counts['skipped']} skipped.")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write(line + "\\n")
+              summary.write(line + "\n")
           PY
 
   secret-scan:

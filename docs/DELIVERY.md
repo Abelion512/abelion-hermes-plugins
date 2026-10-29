@@ -14,6 +14,19 @@ PR #4 is a source-review candidate, not a merged or installed release. No daily-
 | Bot Screen | `screen` | Dashboard-only view of the agent's virtual desktop, with a capability-gated input lease. It does not expose a user's personal display or pause other agent tools. |
 | 9Router Catalog | `9router` | Disabled in this repository's install manifest. The service itself is not modified. The adapter advertises validated IDs from the live local catalog only. |
 
+## Plugin vs. core ownership
+
+Keep feature policy and UI in this repository; keep enforcement primitives and host-wide lifecycle guarantees in `Abelion512/hermes-4gent`. The two repositories must not grow duplicate implementations of the same security boundary.
+
+| Concern | Owner | Keep in this repository | Core-owned contract / improvement |
+|---|---|---|---|
+| Privacy Guard | Plugin policy | Credential/PII/path classifiers, session-local token map, bounded restoration rules, policy configuration, skills and regression fixtures. | Provider/tool execution interception, session lifecycle guarantees, held-stream semantics, fail-closed required-policy gate, and the stable native redaction API. Core must enforce that every supported path crosses the policy; plugin regexes alone cannot establish that guarantee. |
+| Bot Screen | Plugin feature | Screen tab/assets, noVNC presentation, allowlisted display RPCs, view/input lease UX, RFB splice and Screen-specific installer. | Generic dashboard-plugin discovery and API mount, authenticated HTTP/WebSocket handling, capability/consent checks, profile scoping, isolation/host routing, and the underlying virtual-desktop/lease authority. Do not reimplement generic auth or plugin mounting inside Screen. |
+| 9Router Catalog | Optional adapter | Provider-specific `/v1/models` parsing, model-ID validation, catalog docs and selection skill. | Generic provider registration, credential storage, provider transport and lifecycle. This PR intentionally leaves 9Router out of the active install catalog. |
+| Repository operations | Plugin repository | `hermes.json`, `update-plugins.sh`, plugin-specific CI, migration and rollback documentation. | No core change needed unless the native plugin install/update contract itself is defective. |
+
+The Privacy Guard's import of Hermes' private `agent.redact._PREFIX_RE` is a coupling point, not a reason to move the classifier into core. Prefer a stable, documented core helper for shared native detection, introduced in a separate core PR; until then the pinned-core compatibility test must make this dependency explicit. Core-required enforcement changes must be reviewed and merged in the core repository separately, then pinned here by exact commit SHA.
+
 ## Security boundaries and repairs
 
 ### Privacy Guard

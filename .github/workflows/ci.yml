@@ -235,7 +235,7 @@ jobs:
           node -e "require('puppeteer-core')"
       - name: Run all real-host end-to-end tests
         run: |
-          "$HERMES_PYTHON" -m pytest e2e -q -rs
+          "$HERMES_PYTHON" -m pytest plugins/pii_mask_abelion/e2e plugins/screen/e2e -q -rs
 
   secret-scan:
     runs-on: ubuntu-latest

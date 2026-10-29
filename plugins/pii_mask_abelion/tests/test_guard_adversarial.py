@@ -96,7 +96,7 @@ def test_generated_field_mutations_are_masked_before_egress(case_id, text):
 def test_supported_sensitive_shapes_never_appear_in_policy_result(text):
     values = (CANARY, EMAIL, PHONE, NIK, PRIVATE_PATH, "SyntheticPrivateKeyMaterialZ9x7Q5v3")
     result = Guard().required_policy(
-        "request", request=request_for(text), session_id="shape-" + str(abs(hash(text)))
+        "request", request=request_for(text), session_id="shape"
     )
     wire = decision_json(result)
     assert all(value not in wire for value in values), (text, result)

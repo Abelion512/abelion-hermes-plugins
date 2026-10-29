@@ -4,6 +4,7 @@ Every assertion reads the requests the loopback provider recorded. Main and auxi
 requests are judged separately: a request without `tools` is auxiliary.
 Synthetic values only. A FAIL here is a real gap, not a skip.
 """
+import json
 import pytest
 from support.loopback_provider import LoopbackProvider
 from abelion_e2e_support.host import make_profile, run_hermes, wire_text, requires_hermes
@@ -76,3 +77,58 @@ def test_required_mode_masks_requests_before_provider_egress(tmp_path):
     assert srv.main_requests(), "required mode neither sent a sanitized request nor reported a provider request"
     assert srv.requests, "expected requests at the loopback provider"
     assert [leaked(r) for r in srv.requests] == [[]] * len(srv.requests)
+
+
+
+def test_adversarial_mixed_input_forms_are_absent_from_every_provider_request(tmp_path):
+    """Exercise the whole host path with varied synthetic values and serializations."""
+    opaque = "SyntheticWireCanaryOmegaZ9x7Q5v3"
+    json_value = "SyntheticJsonCanaryR8m6N4p2"
+    auth_value = "SyntheticHeaderCanaryW4c8K2m6"
+    url_secret = "SyntheticUrlSecretV4n8Q2"
+    prompt = "\n".join([
+        f"OPENAI_API_KEY={PRIVATE['credential']}",
+        f"api%5Fkey={opaque}",
+        f"Authorization: Bearer {auth_value}",
+        json.dumps({"name": "HF_TOKEN", "value": json_value, "note": "benign-retained"}),
+        f"email {PRIVATE['email']} phone {PRIVATE['phone']} NIK {PRIVATE['nik']}",
+        f"database https://synthetic-user:{url_secret}@db.example.test/private",
+        f"local file {PRIVATE['home_path']}",
+        "public reference https://docs.example.test/guides/api-key-setup",
+    ])
+    srv = chat(tmp_path, prompt, extra_config=REQUIRED_CONFIG)
+    assert srv.requests, "required mode produced no observable provider interaction"
+    wire = json.dumps([item["body"] for item in srv.requests], ensure_ascii=False)
+    canaries = [
+        PRIVATE["credential"], PRIVATE["username"], PRIVATE["email"], PRIVATE["phone"],
+        PRIVATE["nik"], PRIVATE["home_path"], opaque, json_value, auth_value, url_secret,
+    ]
+    assert all(value not in wire for value in canaries), {
+        "leaked": [value for value in canaries if value in wire],
+        "request_count": len(srv.requests),
+    }
+    assert "public reference" in wire
+    assert "docs.example.test/guides/api-key-setup" in wire
+
+
+def test_obfuscated_sensitive_label_never_reaches_provider(tmp_path):
+    """Invisible-format bypass attempts must be blocked rather than partially rewritten."""
+    opaque = "SyntheticUnicodeCanaryY7d3P9"
+    prompt = f"api_\u200bkey={opaque}"
+    srv = chat(tmp_path, prompt, extra_config=REQUIRED_CONFIG)
+    wire = json.dumps([item["body"] for item in srv.requests], ensure_ascii=False)
+    assert opaque not in wire
+
+
+def test_final_model_output_redacts_synthetic_credentials_and_pii(tmp_path):
+    secret = "SyntheticOutputCanaryK8m4Q2"
+    email = "output.private@example.test"
+    reply = f"OPENAI_API_KEY={secret}; contact {email}"
+    with LoopbackProvider([reply]) as srv:
+        home = make_profile(tmp_path, srv.base_url, PLUGIN, REQUIRED_CONFIG)
+        result = run_hermes(home, ["chat", "-q", "return the synthetic sample"], cwd=tmp_path)
+    combined = result.stdout + "\n" + result.stderr
+    assert result.returncode == 0, combined[-2000:]
+    assert srv.main_requests(), "no main request reached the synthetic provider"
+    assert secret not in combined
+    assert email not in combined

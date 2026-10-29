@@ -14,3 +14,6 @@
 
 # Exact synthetic classifier-regression canary in the already-pushed test commit.
 579e8c4f52e8bdcf26e1cadc5798cb755071fd90:pii_mask_abelion/tests/test_classifier_case_invariance.py:generic-api-key:87
+
+# Same synthetic classifier-regression canary surfaced in the consolidation commit; exact commit/path/rule only.
+3dd90ba04e95cd45d865b329e0a56ab018c9878d:pii_mask_abelion/tests/test_classifier_case_invariance.py:generic-api-key:87

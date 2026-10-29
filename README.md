@@ -1,32 +1,41 @@
-# Abelion Hermes plugins
+# Abelion Hermes Plugins
 
-Three focused packages for Hermes Agent. This is a local review candidate, not a merged or installed release.
+A monorepo for standalone Hermes Agent plugins. Each plugin owns its implementation, documentation, unit tests, skills, and feature-specific end-to-end tests. Shared CI and the pinned-core E2E harness live under `.github/`.
 
-| Human name | Stable ID | Folder | Purpose |
+## Active plugins
+
+| Plugin | Runtime ID | Source | Responsibility |
 |---|---|---|---|
-| Privacy Guard | `pii-mask-abelion` | `pii_mask_abelion` | Session masking and held native output redaction |
-| Bot Screen | `screen` | `screen` | Dashboard virtual-desktop view and input takeover |
-| 9Router Catalog (disabled) | `9router` | `model-providers/9router` | Disabled: not listed in hermes.json or installed by update-plugins.sh. Uses live-validated model IDs only; offline catalog is empty. |
+| Privacy Guard | `pii-mask-abelion` | [`plugins/pii_mask_abelion/`](plugins/pii_mask_abelion/) | Session-local PII/credential masking, permitted placeholder restoration, and held output redaction. |
+| Bot Screen | `screen` | [`plugins/screen/`](plugins/screen/) | Dashboard for the agent's virtual desktop and a capability-gated human input lease. |
 
-Names clarify scope; runtime IDs and skill namespaces stay stable. 9Router Catalog does not implement the router. Bot Screen does not show the user's personal display or pause other tools during takeover. Loopback/mock data exists only in test fixtures and is never a production model inventory.
+Each plugin folder contains its own `README.md`, `docs/`, `tests/`, `e2e/`, and `skills/` as applicable. The repository root retains only shared metadata and entry points such as `hermes.json`, `update-plugins.sh`, this README, and GitHub configuration.
 
-## Native first
+## Plugin vs. core
 
-Shield, tool-context and custom RSI are no longer active install targets in this candidate. Prefer Hermes native command approvals, loop/failure guards, file-write baseline checks, skill self-improvement and `/learn`. These are overlapping functions, not identical policy settings. No native configuration has been changed and the installed host version has not been verified. Current native guidance/tool queries handle context and exact time; automatic per-turn UTC injection is not retained.
+Feature policy and UI stay in the plugin repository. Host-wide enforcement, authorization, lifecycle, and execution guarantees belong in the Hermes core fork. Do not duplicate the same security boundary in both places.
 
-Retired source and its earlier cross-plugin tests are preserved in [rollback](rollback/README.md). Existing lesson files and metrics are untouched. This source cleanup does not uninstall existing plugins from any profile.
+- **Privacy Guard plugin:** credential/PII/path classification, session-local token mapping, bounded restoration, policy configuration, skills, and regression tests.
+- **Hermes core:** provider/tool interception, mandatory fail-closed policy gates, session lifecycle, held-stream semantics, and stable native redaction contracts.
+- **Bot Screen plugin:** Screen tab, noVNC presentation, display RPC allowlist, and takeover/hand-back UX.
+- **Hermes core:** plugin discovery/API mounting, dashboard HTTP/WebSocket authorization, capability and consent checks, profile isolation, and virtual-desktop/lease authority.
 
-## Privacy boundary
+Bot Screen's lease governs virtual-desktop input only. **It is not general human-in-the-loop (HITL): it does not pause all agent tools or require human approval for arbitrary actions.** General HITL must be designed as a separate core-owned execution/approval gate, with any UI kept in a plugin.
 
-Privacy Guard requires held-output support. Mandatory request/tool/output protection needs the matching, unadopted core change. Stock Hermes plus this plugin is not equivalent mandatory protection. Unsupported or missing required policy denies; it is not a process-wide network firewall. See [Privacy Guard](pii_mask_abelion/README.md).
+The standalone `decolua/9router` project owns its router implementation. This repository does not vendor or maintain a duplicate adapter.
 
-## Installation is separate
+## Security and compatibility
 
-No daily-profile install is authorized or performed by this candidate. After host compatibility, reviewed revision and profile are confirmed, use native plugin management with the selected folder and pinned revision. Do not use `update-plugins.sh` to fetch an unmerged candidate. Existing retired plugins must be disabled/removed separately while stopped, following [migration](docs/MIGRATION.md), never silently through source deletion.
+Mandatory Privacy Guard behavior requires the exact Hermes fork commit `9a85916c87d56c2ca00b02fad8918f93ef1816e9` from [`Abelion512/hermes-4gent`](https://github.com/Abelion512/hermes-4gent). CI checks out that commit for real-host tests. This does not certify stock Hermes, prove upstream adoption, or provide a process-wide network firewall. Detection remains heuristic, and unsupported transports are not universally covered.
 
-- [Bot Screen](screen/README.md)
-- [9Router Catalog](model-providers/9router/README.md)
-- [Compatibility and local evidence](docs/DELIVERY.md)
-- [GitHub Pages preparation](docs/PAGES.md)
+Bot Screen is for the agent's virtual desktop, not the user's personal display. Browser/display E2E tests do not certify model-driven computer use, phone/Tailscale access, abrupt-disconnect behavior, or an installed laptop.
 
-GitHub Pages documentation is prepared locally only. No site or public URL is published yet.
+## Validation
+
+CI runs each plugin's own tests and dependency checks, plus a real-host E2E suite with a synthetic loopback provider, disposable profiles, and the exact core commit above. No real provider or production credentials are used. A green CI run is evidence for its tested commit and paths only.
+
+## Installation and migration
+
+`update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`; it does not migrate an installed profile, change its privacy settings, or remove old installed plugins. Review the target profile, stop the running Hermes process, back up its config and plugin versions, then use native plugin management for removals. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
+
+Retired source can be recovered from Git history as documented in [`.github/retired-source-recovery.md`](.github/retired-source-recovery.md). An old installed copy is separate state and is not deleted merely because its source was removed from this repository.

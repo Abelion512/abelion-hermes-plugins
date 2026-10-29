@@ -1,34 +1,10 @@
-# Applied by .github/workflows/labeler.yml (actions/labeler). Label = plugin folder.
+# Applied by .github/workflows/labeler.yml. Labels follow plugin ownership.
 screen:
   - changed-files:
-      - any-glob-to-any-file:
-          - "screen/**"
-          - "e2e/test_screen_*.py"
-shield:
-  - changed-files:
-      - any-glob-to-any-file: "shield_abelion/**"
+      - any-glob-to-any-file: "plugins/screen/**"
 pii-mask:
   - changed-files:
-      - any-glob-to-any-file:
-          - "pii_mask_abelion/**"
-          - "e2e/test_privacy_*.py"
-output-redact:
-  - changed-files:
-      - any-glob-to-any-file: "output_redact_abelion/**"
-tool-context:
-  - changed-files:
-      - any-glob-to-any-file: "tool_context_abelion/**"
-rsi-learn:
-  - changed-files:
-      - any-glob-to-any-file: "rsi_learn_abelion/**"
-9router:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "model-providers/9router/**"
-          - "e2e/test_nine_router_*.py"
-worktree-guard:
-  - changed-files:
-      - any-glob-to-any-file: "worktree_guard_abelion/**"
+      - any-glob-to-any-file: "plugins/pii_mask_abelion/**"
 ci:
   - changed-files:
       - any-glob-to-any-file: ".github/workflows/**"
@@ -36,15 +12,16 @@ dependencies:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/dependabot.yml"
-          - "**/requirements*.txt"
-          - "**/plugin-requirements.txt"
+          - "plugins/**/requirements*.txt"
+          - "plugins/**/plugin-requirements.txt"
 audit:
   - changed-files:
-      - any-glob-to-any-file: "audits/**"
+      - any-glob-to-any-file: "plugins/pii_mask_abelion/validation/**"
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - "docs/**"
-          - "*/docs/**"
+          - ".github/plugin-docs-standard.md"
+          - "plugins/**/docs/**"
+          - "plugins/**/README.md"
+          - "plugins/**/e2e/README.md"
           - "README.md"
-          - "e2e/README.md"

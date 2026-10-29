@@ -41,6 +41,31 @@ def flow(tmp_path_factory):
     if os.environ.get("SCREEN_E2E_MIN_FREE_MB"): cfg += f"bot_desktop:\n  min_free_memory_mb: {int(os.environ['SCREEN_E2E_MIN_FREE_MB'])}\n"
     (h / "config.yaml").write_text(cfg)
     env = hermetic_env(home)
+    preflight_code = r'''
+import json
+from hermes_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
+from hermes_cli.web_server_dashboard import _discover_dashboard_plugins, _plugin_api_mount_skip_reason
+enabled, disabled = _get_enabled_set(), _get_disabled_set()
+plugins = _discover_dashboard_plugins()
+screen = [p for p in plugins if p.get("name") == "screen"]
+print(json.dumps({
+    "enabled": sorted(enabled),
+    "disabled": sorted(disabled),
+    "screen": [{
+        "source": p.get("source"),
+        "api_file": p.get("_api_file"),
+        "dir_exists": bool(p.get("_dir") and p["_dir"].is_dir()),
+        "skip_reason": _plugin_api_mount_skip_reason(p, enabled, disabled),
+    } for p in screen],
+}, sort_keys=True))
+'''
+    preflight = subprocess.run(
+        [HERMES_PYTHON, "-c", preflight_code],
+        env=env, capture_output=True, text=True, timeout=20,
+    )
+    if preflight.returncode:
+        pytest.fail("Screen API preflight command failed: " + preflight.stderr[-2000:])
+    print("SCREEN E2E plugin API preflight: " + preflight.stdout.strip())
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     dashboard_log = tmp / "dashboard.log"
     with dashboard_log.open("w", encoding="utf-8") as log:

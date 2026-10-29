@@ -6,7 +6,7 @@ Host caveat: Bot Desktop refuses to start below its free-memory guard; SCREEN_E2
 for constrained CI hosts only (reported by the test, never a default).
 Not covered: model-driven computer_use, phone/Tailscale, abrupt tab close, a user's own desktop.
 """
-import json, os, shutil, signal, socket, subprocess, sys, time, urllib.request
+import json, os, re, shutil, signal, socket, subprocess, sys, time, urllib.request
 from pathlib import Path
 import pytest
 from support.host import HERMES_PYTHON, OFFER, PLUGINS, desktop_env, hermetic_env

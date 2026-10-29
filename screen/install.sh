@@ -10,8 +10,13 @@ else
   echo "!! HOME or HERMES_HOME must be set."
   exit 1
 fi
-if [[ -z "$HERMES_HOME_DIR" || "$HERMES_HOME_DIR" == "/" || "$HERMES_HOME_DIR" != /* ]]; then
+if [[ -z "$HERMES_HOME_DIR" || "$HERMES_HOME_DIR" != /* ]]; then
   echo "!! refusing unsafe Hermes home: $HERMES_HOME_DIR"
+  exit 1
+fi
+HERMES_HOME_DIR="$(realpath -m -- "$HERMES_HOME_DIR")"
+if [[ "$HERMES_HOME_DIR" == "/" ]]; then
+  echo "!! refusing unsafe Hermes home: /"
   exit 1
 fi
 

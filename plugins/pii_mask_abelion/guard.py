@@ -121,8 +121,9 @@ class Guard:
             from agent.redact import _PREFIX_RE
             for m in _PREFIX_RE.finditer(text): add(*m.span(),'SECRET')
         except ImportError: pass
-        for m in re.finditer(r'--(?P<name>[A-Za-z][A-Za-z0-9_.-]{1,100})[ =](?P<value>"[^"\n]*"|\'[^\'\n]*\'|[^\s"\',;&<>{}\[\]()]+)',text):
-            if cred.classify_field(m["name"].lstrip("-")):
+        for m in re.finditer(r'--(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})[ =](?P<value>"[^"\n]*"|\'[^\'\n]*\'|[^\s"\',;&<>{}\[\]()]+)',text):
+            name=unquote(unquote(m["name"].lstrip("-")))
+            if cred.classify_field(name) or name.lower() in AUTH_KEYS or LABEL.fullmatch(name):
                 a,b=m.span("value");v=m["value"]
                 if v[:1] in ("\"", "'"):a+=1;b-=1
                 add(a,b,"SECRET")

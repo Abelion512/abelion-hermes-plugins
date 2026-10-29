@@ -34,7 +34,7 @@ pytestmark = pytest.mark.skipif(bool(MISSING), reason="NOT RUN: missing " + ", "
 
 
 @pytest.fixture(scope="module")
-def flow(tmp_path_factory, request):
+def flow(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("screen"); home = tmp / "home"; h = home / ".hermes"; (h / "plugins").mkdir(parents=True)
     shutil.copytree(PLUGINS / "screen", h / "plugins" / "screen", ignore=shutil.ignore_patterns("tests", "__pycache__"))
     cfg = f"plugins:\n  enabled: [screen]\ntelemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n    offer_version: {OFFER}\n"
@@ -67,7 +67,7 @@ def flow(tmp_path_factory, request):
         def run():  # desktop state is created on Connect; driver reads display lazily
             display = ":" + ((bd / "display").read_text().strip() if (bd / "display").exists() else "20")
             return subprocess.run(
-                [NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen", CHROME, str(tmp / "mk_"),
+                [NODE, str(DRIVER), f"http://127.0.0.1:{port}/screen?profile=current", CHROME, str(tmp / "mk_"),
                  str(bd / "Xauthority"), display],
                 capture_output=True, text=True, timeout=120,
                 env=desktop_env(home, display, str(bd / "Xauthority")),
@@ -102,16 +102,6 @@ def flow(tmp_path_factory, request):
                 print("SCREEN dashboard diagnostics unavailable: " + type(exc).__name__)
         yield payload
     finally:
-        if request.session.testsfailed:
-            try:
-                lines = dashboard_log.read_text(encoding="utf-8", errors="replace").splitlines()
-                needles = ("Plugin screen", "plugin screen", "Failed to load plugin", "plugin API",
-                           "Plugin not found", "refusing unsafe api", "skipping API mount",
-                           "plugins.enabled", "not in plugins.enabled")
-                selected = [line for line in lines if any(term in line for term in needles)]
-                print("\\nSCREEN dashboard backend diagnostics:\\n" + "\\n".join(selected[-40:]))
-            except Exception as exc:
-                print("SCREEN dashboard diagnostics unavailable: " + type(exc).__name__)
         subprocess.run([HERMES_PYTHON, "-m", "hermes_cli.main", "dashboard", "--stop"], env=env, capture_output=True)
         if dash.poll() is None:
             os.killpg(dash.pid, signal.SIGTERM)

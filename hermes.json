@@ -1,17 +1,17 @@
 {
   "name": "abelion-hermes-plugins",
-  "description": "Privacy Guard and Bot Screen for Hermes Agent (9Router Catalog disabled, code kept)",
+  "description": "Privacy Guard and Bot Screen for Hermes Agent",
   "version": "1.0.0",
   "author": "Abelion",
   "plugins": [
     {
       "id": "pii-mask-abelion",
-      "path": "pii_mask_abelion",
+      "path": "plugins/pii_mask_abelion",
       "description": "Privacy Guard: session-bound request/tool masking and held output redaction"
     },
     {
       "id": "screen",
-      "path": "screen",
+      "path": "plugins/screen",
       "description": "Bot Screen: dashboard view and input takeover for the agent virtual desktop"
     }
   ]

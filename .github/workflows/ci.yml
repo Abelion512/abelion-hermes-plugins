@@ -87,8 +87,8 @@ jobs:
           P: ${{ matrix.plugin }}
         run: |
           python -m compileall -q "$P"
-          if [ "$P" = screen ]; then
-            bash -n screen/install.sh screen/uninstall.sh
+          if [ "$P" = plugins/screen ]; then
+            bash -n "$P/install.sh" "$P/uninstall.sh"
           fi
       - name: tests
         env:
@@ -111,27 +111,11 @@ jobs:
           done < <(find "$P" -name 'requirements*.txt' -o -name 'plugin-requirements.txt' | sort -u)
           [ "$found" = 1 ] || echo "no requirements files in $P"
 
-  # Tests that live in a root tests/ folder (not inside a plugin folder).
-  root-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: "3.14"
-      - run: |
-          if [ -d tests ]; then
-            python -m pip install pytest
-            python -m pytest tests -q
-          else
-            echo "no root tests/ folder"
-          fi
-
   # Real host E2E: never silently skip host-dependent tests. Pin the exact
   # required-privacy core revision, verify the imported source matches it, and
   # use only a synthetic loopback provider plus disposable profiles.
   e2e:
-    name: Real Hermes E2E (pinned core, privacy, 9Router, Screen)
+    name: Real Hermes E2E (pinned core, Privacy Guard, Bot Screen)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:

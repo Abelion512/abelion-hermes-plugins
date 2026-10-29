@@ -184,6 +184,31 @@ jobs:
           python -m pip install uv==0.13.5
           uv sync --project ./hermes-core --no-dev
           uv pip install --python "$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" pytest==9.1.1
+          # The real-host harness copies plugin directories directly into a disposable profile,
+          # bypassing Hermes' normal plugin installer. Install declared dependencies for active
+          # catalog plugins into the same pinned Hermes environment before loading their APIs.
+          "$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          import hermes_yaml as yaml
+
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          catalog = json.loads((root / "hermes.json").read_text(encoding="utf-8"))
+          dependencies = []
+          for plugin in catalog.get("plugins", []):
+              path = root / plugin["path"] / "plugin.yaml"
+              if not path.is_file():
+                  continue
+              with path.open(encoding="utf-8") as handle:
+                  manifest = yaml.safe_load(handle) or {}
+              declared = manifest.get("python_dependencies", [])
+              if not isinstance(declared, list) or not all(isinstance(item, str) and item.strip() for item in declared):
+                  raise SystemExit(f"Invalid python_dependencies in {path}")
+              dependencies.extend(declared)
+          dependencies = list(dict.fromkeys(dependencies))
+          if dependencies:
+              subprocess.run(["uv", "pip", "install", "--python", sys.executable, *dependencies], check=True)
+          PY
           echo "HERMES_PYTHON=$GITHUB_WORKSPACE/hermes-core/.venv/bin/python" >> "$GITHUB_ENV"
           # Dashboard's --skip-build mode requires the matching, fresh web_dist in Hermes core.
           (cd hermes-core && npm install --workspace web && npm run build -w web)

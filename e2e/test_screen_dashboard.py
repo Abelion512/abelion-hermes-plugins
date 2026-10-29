@@ -54,7 +54,7 @@ print(json.dumps({
     "screen": [{
         "source": p.get("source"),
         "api_file": p.get("_api_file"),
-        "dir_exists": bool(p.get("_dir") and p["_dir"].is_dir()),
+        "dir_exists": bool(p.get("_dir") and __import__("pathlib").Path(p["_dir"]).is_dir()),
         "skip_reason": _plugin_api_mount_skip_reason(p, enabled, disabled),
     } for p in screen],
 }, sort_keys=True))

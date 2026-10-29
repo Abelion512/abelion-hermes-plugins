@@ -29,7 +29,33 @@ AUTH_KEYS = frozenset({'authorization', 'proxy-authorization'})
 MARKER = '[GUARD_WITHHELD]'
 JWT_MATERIAL = re.compile(r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?')
 COOKIE_HEADER = re.compile(r'(?im)^(?:Cookie|Set-Cookie)\s*:\s*[^\r\n]*[^\s=;]+=[^\s;]+')
-SESSION_ASSIGN = re.compile(r'(?im)^\s*(?:JSESSIONID|sessionid)\s*=\s*[^\s]+\s*
+SESSION_ASSIGN = re.compile(r'(?im)^\s*(?:JSESSIONID|sessionid)\s*=\s*[^\s]+\s*$')
+# Zero-width and bidirectional formatting characters can make a sensitive field
+# visually match while evading an ASCII classifier. If one occurs inside a
+# sensitive assignment/name, fail closed rather than attempt index-unsafe repair.
+INVISIBLE_FORMAT = re.compile(r'[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]')
+OBFUSCATED_ASSIGN_HEAD = re.compile(
+    r'(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})[ \t]*(?:[:=]|%3[DdAa])[ \t]*'
+)
+
+
+def _invisible_sensitive_name(name):
+    if not INVISIBLE_FORMAT.search(name):
+        return False
+    normalized = INVISIBLE_FORMAT.sub('', name)
+    normalized = unquote(unquote(normalized))
+    return bool(cred.classify_field(normalized) or normalized.lower() in AUTH_KEYS or LABEL.fullmatch(normalized))
+
+
+def _has_obfuscated_sensitive_assignment(text):
+    if not INVISIBLE_FORMAT.search(text):
+        return False
+    normalized = INVISIBLE_FORMAT.sub('', text)
+    for match in OBFUSCATED_ASSIGN_HEAD.finditer(normalized):
+        name = unquote(unquote(match['name']))
+        if cred.classify_field(name) or name.lower() in AUTH_KEYS or LABEL.fullmatch(name):
+            return True
+    return False
 
 @dataclass(repr=False)
 class Entry:

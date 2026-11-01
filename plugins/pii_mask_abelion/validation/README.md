@@ -1,4 +1,7 @@
-# Uploaded ChatGPT matrix
+# Historical imported adversarial matrix
+
+> This is a legacy offline evaluation record, not the source of truth for current CI. The live regression suite is `../tests/`; pinned-host egress evidence is under `../e2e/`. Keep historical failures visible rather than folding them into the current passing-test count.
+
 
 Original JSONL: 278 unique IDs, SHA256 a6305f45e1a55f9e0305dae9d4e51eada4fe17e4ea7d0e7f7ef885653ace8722. Source: user-uploaded ZIP, 28 October 2026. Inputs and expectations are unchanged.
 

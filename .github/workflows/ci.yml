@@ -95,10 +95,35 @@ jobs:
           P: ${{ matrix.plugin }}
         run: |
           if [ -d "$P/tests" ]; then
-            python -m pytest "$P/tests" -q
+            python -m pytest "$P/tests" -q --junitxml="$RUNNER_TEMP/${P##*/}-tests.xml"
           else
             echo "::notice title=$P::no tests in this plugin yet (syntax check only)"
           fi
+      - name: Unit test summary
+        if: always()
+        env:
+          P: ${{ matrix.plugin }}
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          plugin = os.environ["P"]
+          report = Path(os.environ["RUNNER_TEMP"]) / (plugin.rsplit("/", 1)[-1] + "-tests.xml")
+          if not report.is_file():
+              line = f"- {plugin}: JUnit report unavailable; inspect the test step log."
+          else:
+              root = ET.parse(report).getroot()
+              suites = [root] if root.tag == "testsuite" else root.findall(".//testsuite")
+              counts = {name: sum(int(suite.attrib.get(name, 0)) for suite in suites)
+                        for name in ("tests", "failures", "errors", "skipped")}
+              line = (f"- **{plugin}**: {counts['tests']} tests, "
+                      f"{counts['failures']} failures, {counts['errors']} errors, "
+                      f"{counts['skipped']} skipped.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(line + "\n")
+          PY
       - name: dependency audit
         env:
           P: ${{ matrix.plugin }}
@@ -235,7 +260,29 @@ jobs:
           node -e "require('puppeteer-core')"
       - name: Run all real-host end-to-end tests
         run: |
-          "$HERMES_PYTHON" -m pytest plugins/pii_mask_abelion/e2e plugins/screen/e2e -q -rs
+          "$HERMES_PYTHON" -m pytest plugins/pii_mask_abelion/e2e plugins/screen/e2e -q -rs --junitxml="$RUNNER_TEMP/real-host-e2e.xml"
+      - name: Real-host E2E summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "real-host-e2e.xml"
+          if not report.is_file():
+              line = "- Real-host E2E: JUnit report unavailable; inspect the E2E step log."
+          else:
+              root = ET.parse(report).getroot()
+              suites = [root] if root.tag == "testsuite" else root.findall(".//testsuite")
+              counts = {name: sum(int(suite.attrib.get(name, 0)) for suite in suites)
+                        for name in ("tests", "failures", "errors", "skipped")}
+              line = (f"- **Real-host E2E**: {counts['tests']} tests, "
+                      f"{counts['failures']} failures, {counts['errors']} errors, "
+                      f"{counts['skipped']} skipped.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(line + "\n")
+          PY
 
   secret-scan:
     runs-on: ubuntu-latest

@@ -11,6 +11,7 @@ This is compatibility evidence for that exact fork commit. It does not certify s
 ## Layout
 
 - `test_privacy_wire.py`: main and auxiliary provider requests and tool-result replay.
+  It also tests mixed adversarial input forms across all observed provider requests, fail-closed handling of invisible Unicode labels, and final-output redaction.
 - `test_loopback_provider.py`: the synthetic local OpenAI-compatible provider.
 - `test_support_environment.py`: child-process environment allowlisting.
 - `support/loopback_provider.py`: server fixture that records local test traffic.
@@ -27,4 +28,4 @@ REQUIRE_HERMES_E2E=1 \
 python -m pytest plugins/pii_mask_abelion/e2e -v -rs
 ```
 
-Synthetic canaries only; no external model API is contacted and inherited provider credentials are stripped from test subprocesses.
+Synthetic canaries only; no external model API is contacted and inherited provider credentials are stripped from test subprocesses. The loopback test verifies the host boundary, not compatibility with a particular remote model or a model-size class.

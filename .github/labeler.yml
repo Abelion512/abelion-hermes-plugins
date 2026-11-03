@@ -1,22 +1,27 @@
-# Applied by .github/workflows/labeler.yml. Labels follow plugin ownership.
-screen:
-  - changed-files:
-      - any-glob-to-any-file: "plugins/screen/**"
-pii-mask:
-  - changed-files:
-      - any-glob-to-any-file: "plugins/pii_mask_abelion/**"
+# Applied by .github/workflows/labeler.yml.
+#
+# This file is the repo-level label set. It should cover shared/repo-wide paths
+# and remain stable as plugins appear and disappear. Plugin-specific path labels
+# live in each plugin's own .github/labels.yml so the repo labeler does not need
+# to be rewritten every time a plugin is added or removed.
+#
+# Priority-style labels (P0/P1/P2/P3, etc.) are set by convention and/or CI /
+# issue triage, not by changed-files alone. Use them to rank work, not to guess
+# impact from a glob.
+
+# Repo-wide labels
+
 ci:
   - changed-files:
       - any-glob-to-any-file: ".github/workflows/**"
+
 dependencies:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/dependabot.yml"
           - "plugins/**/requirements*.txt"
           - "plugins/**/plugin-requirements.txt"
-audit:
-  - changed-files:
-      - any-glob-to-any-file: "plugins/pii_mask_abelion/validation/**"
+
 documentation:
   - changed-files:
       - any-glob-to-any-file:
@@ -25,3 +30,20 @@ documentation:
           - "plugins/**/README.md"
           - "plugins/**/e2e/README.md"
           - "README.md"
+
+security-audit:
+  - changed-files:
+      - any-glob-to-any-file: ".github/e2e_support/**"
+
+# Plugin ownership is handled by each plugin-local labels.yml.
+# The repo labeler merge step reads plugins/*/.github/labels.yml and applies
+# those labels in addition to the repo labels above.
+#
+# If a plugin wants its own path labels, add them in:
+#   plugins/<id>/.github/labels.yml
+#
+# Required-format example:
+#
+# plugin-feature:
+#   - changed-files:
+#       - any-glob-to-any-file: "src/**"

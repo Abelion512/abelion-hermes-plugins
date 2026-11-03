@@ -2,7 +2,7 @@ name: labeler
 
 # pull_request_target runs the workflow file from the base branch with write access.
 # Safe here because nothing from the PR is checked out or executed: labeler only
-# reads the list of changed file names and the config from the base branch.
+# reads changed file names and the label config from the base branch.
 on:
   pull_request_target:
 
@@ -19,7 +19,42 @@ jobs:
       pull-requests: write  # add labels to the PR
       issues: write         # create labels that do not exist yet
     steps:
-      # actions/labeler v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: |
+            .github
+            plugins
+            hermes.json
+      - name: merge plugin-local labels
+        run: |
+          python - <<'PY'
+          import os, glob, yaml, json, sys
+
+          repo = {} 
+          repo_path = os.path.join(os.getcwd(), ".github", "labeler.yml")
+          if os.path.exists(repo_path):
+              with open(repo_path, encoding="utf-8") as f:
+                  repo = yaml.safe_load(f) or {}
+
+          combined = dict(repo)
+          for path in sorted(glob.glob("plugins/*/.github/labels.yml")):
+              with open(path, encoding="utf-8") as f:
+                  plugin = yaml.safe_load(f) or {}
+              for key, rule in plugin.items():
+                  if key in combined:
+                      print(f"warn: plugin label {key!r} from {path} conflicts with existing label; skipping", file=sys.stderr)
+                  else:
+                      combined[key] = rule
+
+          out = os.environ.get("GITHUB_OUTPUT", "/dev/null")
+          os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+          with open("merged_labeler.yml", "w", encoding="utf-8") as f:
+              yaml.safe_dump(combined, f, sort_keys=False)
+          print("merged_labeler_path=merged_labeler.yml", file=os.environ["GITHUB_OUTPUT"] if "GITHUB_OUTPUT" in os.environ else sys.stdout)
+          print("labels_count=%d" % len(combined), file=os.environ["GITHUB_OUTPUT"] if "GITHUB_OUTPUT" in os.environ else sys.stdout)
+          PY
       - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13
         with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: merged_labeler.yml
           sync-labels: true

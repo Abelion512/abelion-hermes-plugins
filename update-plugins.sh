@@ -16,7 +16,7 @@ cd "$REPO"
 git pull --ff-only
 
 echo "Syncing active plugins to $PLUGIN_DIR..."
-for d in pii_mask_abelion screen; do
+for d in nebula; do
   rsync -a --delete "$REPO/plugins/$d/" "$PLUGIN_DIR/$d/"
   echo "  synced $d"
 done

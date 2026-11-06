@@ -152,6 +152,7 @@ jobs:
           P: ${{ matrix.plugin }}
         run: |
           python -m pip install pip-audit pytest
+          python -m pip install pyyaml
           for f in "$P"/tests/requirements*.txt; do
             [ -f "$f" ] && python -m pip install -r "$f"
           done
@@ -385,6 +386,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.14"
+      - name: pip install pyyaml
+        run: python -m pip install pyyaml
       - name: lint plugin manifests and skill frontmatter
         run: |
           python - <<'PY'

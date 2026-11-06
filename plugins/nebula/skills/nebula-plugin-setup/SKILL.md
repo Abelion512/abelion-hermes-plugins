@@ -1,6 +1,6 @@
 ---
 name: nebula-plugin-setup
-description: Set up, enable, configure, roll back, and disable the nebula plugin safely.
+description: Set up, enable, roll back, and disable the nebula plugin.
 version: 0.1.0
 platforms: [linux, macos, windows]
 metadata:

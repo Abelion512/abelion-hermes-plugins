@@ -1,6 +1,6 @@
 ---
 name: nebula-plugin-debug
-description: Debug and reproduce nebula Privacy Guard failures with a repeatable workflow.
+description: Debug and reproduce nebula Privacy Guard failures.
 version: 0.1.0
 platforms: [linux, macos, windows]
 metadata:

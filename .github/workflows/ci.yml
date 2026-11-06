@@ -63,7 +63,7 @@ jobs:
   # missing plugin manifest, or a bare provider-supplied key shape must not
   # become mergeable through labeling or review alone.
   credential-guard:
-    if: github.event_name == pull_request
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -376,7 +376,7 @@ jobs:
   # Repo-wide doc and manifest hygiene. A new plugin should not land with a
   # broken skill frontmatter, missing docs trio, or inconsistent status claim.
   doc-and-manifest-lint:
-    if: github.event_name == pull_request || github.event_name == push || github.event_name == workflow_dispatch
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

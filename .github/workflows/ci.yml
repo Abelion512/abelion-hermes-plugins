@@ -52,7 +52,7 @@ jobs:
               for d in $all; do
                 case "$f" in "$d"/*) hit="$d"; break;; esac
               done
-              if [ -n "$hit" ]; then sel="$sel$hit$'\n"; else shared=1; fi
+              if [ -n "$hit" ]; then sel="$sel$hit"$'\n'; else shared=1; fi
             done <<< "$changed"
             [ "$shared" = 1 ] && sel="$all"
           fi

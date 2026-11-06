@@ -44,6 +44,20 @@ jobs:
                   if key in combined:
                       print(f"warn: plugin label {key!r} from {path} conflicts with existing label; skipping", file=sys.stderr)
                   else:
+                      # Labeler v7 matches repo-root-relative paths; plugin-local
+                      # files document globs as plugin-relative -- prefix them.
+                      prefix = os.path.dirname(os.path.dirname(path)).replace("\\", "/")
+                      rule = json.loads(json.dumps(rule))  # deep copy
+                      for sec in (rule if isinstance(rule, list) else [rule]):
+                          if not isinstance(sec, dict):
+                              continue
+                          for cf in sec.get("changed-files", []):
+                              if not isinstance(cf, dict):
+                                  continue
+                              gk = "any-glob-to-any-file"
+                              if gk in cf:
+                                  globs = cf[gk] if isinstance(cf[gk], list) else [cf[gk]]
+                                  cf[gk] = [g if g.startswith(prefix + "/") else f"{prefix}/{g}" for g in globs]
                       combined[key] = rule
 
           out = os.environ.get("GITHUB_OUTPUT", "/dev/null")

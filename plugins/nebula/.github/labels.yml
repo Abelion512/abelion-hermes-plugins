@@ -3,7 +3,7 @@
 # plugin only.
 #
 # Priority labels are intentionally not defined here. Priority is a triage/intent
-# judgment, not a changed-file pattern. See ../../docs/PRIORITY_LABELS.md.
+# judgment, not a changed-file pattern. See ../../../docs/PRIORITY_LABELS.md.
 
 todo:
   - changed-files:

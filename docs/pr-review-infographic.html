@@ -1,0 +1,17 @@
+<div>
+<h2>PR reviewer bot — infographic</h2>
+<p>Workflow: PR open/push → reviewer bot → verify → rank P0–P4 → summary + diagram → human approve.</p>
+<table>
+<tr><td>Trigger</td><td><code>pull_request_target: opened/synchronize/reopened</code></td></tr>
+<tr><td>Score</td><td>Greptile 0–5, confidence before merge</td></tr>
+<tr><td>Labels</td><td>P0 critical · P1 high · P2 medium · P3 nit · P4 docs/chore</td></tr>
+<tr><td>Auto-approve</td><td>score ≥ 4.5, no risks, no bulk flags</td></tr>
+<tr><td>Auto-merge</td><td>P4 low-impact only; all else comment-only</td></tr>
+<tr><td>Reference</td><td>Anthropic orchestrator-workers · hermes-agent teknium1 Root cause/Changes/Validation</td></tr>
+</table>
+<pre>sequenceDiagram
+  PR → Bot: opened / synchronize
+  Bot → Verify: candidate findings
+  Verify → Bot: confirmed findings only
+  Bot → PR: summary + score + diagram + P-label</pre>
+</div>

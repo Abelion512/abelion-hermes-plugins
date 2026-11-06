@@ -1,4 +1,40 @@
 # Applied by .github/workflows/labeler.yml. Labels follow plugin ownership.
+# Priority labels (bare, Anthropic/hermes-agent style): P0 critical, P1 high,
+# P2 medium, P3 low nit, P4 docs/chore low-impact.
+# labeler matches by changed files; pr-review.py attach/escalate by risk.
+P0:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/pii_mask_abelion/guard.py"
+          - "plugins/pii_mask_abelion/pii_middleware.py"
+          - "plugins/pii_mask_abelion/output_redact.py"
+          - "plugins/pii_mask_abelion/_credentials.py"
+          - "plugins/pii_mask_abelion/_patterns.py"
+          - "plugins/nebula/guard.py"
+          - "plugins/nebula/*.py"
+P1:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/**/plugin.yaml"
+          - "plugins/**/plugin.py"
+          - "plugins/**/main*.py"
+          - "hermes.json"
+P2:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/**/tests/**"
+          - "plugins/**/e2e/**"
+          - "tests/**"
+P3:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/scripts/**"
+P4:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**.md"
 screen:
   - changed-files:
       - any-glob-to-any-file: "plugins/screen/**"

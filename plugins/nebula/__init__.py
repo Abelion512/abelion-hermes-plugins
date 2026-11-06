@@ -31,3 +31,7 @@ def register(ctx):
                        'Work with masked PII, credential and path placeholders.')
         register_skill('redacted-output-handling', Path(__file__).parent / 'skills' / 'redacted-output-handling' / 'SKILL.md',
                        'Handle responses passed through credential redaction.')
+        register_skill('nebula-plugin-setup', Path(__file__).parent / 'skills' / 'nebula-plugin-setup' / 'SKILL.md',
+                       'Set up, enable, configure, roll back, and disable the nebula plugin safely.')
+        register_skill('nebula-plugin-debug', Path(__file__).parent / 'skills' / 'nebula-plugin-debug' / 'SKILL.md',
+                       'Debug and reproduce nebula Privacy Guard failures with a repeatable workflow.')

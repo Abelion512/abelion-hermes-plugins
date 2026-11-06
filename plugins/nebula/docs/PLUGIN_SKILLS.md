@@ -1,10 +1,9 @@
 # Nebula skills coverage
 
-This plugin ships skills for agent-facing operations. The main skill today is
-`nebula:privacy-mask-placeholders`, registered through native `ctx.register_skill`
-and visible in `skills_list` and `skill_view` while the plugin is enabled. The
-plugin also adds a short session prompt note through
-`register_system_prompt_section`.
+This plugin ships skills for agent-facing operations. Four skills are
+registered through native `ctx.register_skill` and visible in `skills_list`
+and `skill_view` while the plugin is enabled. The plugin also adds a short
+session prompt note through `register_system_prompt_section`.
 
 ## What this plugin's skills should cover
 
@@ -25,6 +24,10 @@ plugin also adds a short session prompt note through
 
 - `skills/privacy-mask-placeholders/SKILL.md`
 - `skills/redacted-output-handling/SKILL.md`
+- `skills/nebula-plugin-setup/SKILL.md` — install, Tahap A/B enable, disable,
+  rollback, and the disposable-profile verification path.
+- `skills/nebula-plugin-debug/SKILL.md` — reproduce → locate layer → root
+  cause → failing-then-passing test loop for guard failures.
 
 If a future capability needs its own skill, add it under `skills/<name>/SKILL.md`
 and register it in the plugin init path. Do not expand a skill until the

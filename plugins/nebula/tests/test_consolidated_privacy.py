@@ -33,7 +33,7 @@ def test_one_output_hook_and_one_required_policy_owner():
     outputs=[x for x in ctx.hooks if x[0]=='transform_llm_output']
     assert len(outputs)==1 and outputs[0][2] is True
     assert len([x for x in ctx.middleware if x[0]=='llm_privacy'])==1
-    assert {x[0] for x in ctx.skills}=={'privacy-mask-placeholders','redacted-output-handling'}
+    assert {x[0] for x in ctx.skills}=={'privacy-mask-placeholders','redacted-output-handling','nebula-plugin-setup','nebula-plugin-debug'}
 
 
 def test_unified_native_redactor_failure_withholds():

@@ -13,10 +13,11 @@ Right now there is one active plugin, **Privacy Guard (nebula)**: session-local 
   - `output_redact.py` — `transform_llm_output` hook: parenthetical credential pattern + native Hermes redactor.
   - `_credentials.py` — field-name + vendor-prefix secret detection.
   - `_patterns.py` — shared prose parenthetical credential patterns.
-  - `skills/` — two registered skills: `privacy-mask-placeholders`, `redacted-output-handling`.
+  - `skills/` — four registered skills: `privacy-mask-placeholders`, `redacted-output-handling`, `nebula-plugin-setup`, `nebula-plugin-debug`.
   - `docs/` — `USAGE.md`, `VALIDATION.md`.
   - `tests/` — standalone plugin tests.
   - `e2e/` — real-host E2E with loopback provider.
+  - `validation/` — historical imported adversarial matrix; legacy evidence only, not current CI passes.
 - `docs/SESSION_HISTORY.md` — plugin session notes (mask/restore discussion, test status, open items).
 - `docs/title-reference.md` — internal naming tiers; cosmic/Latin names only, no external model labels.
 - `update-plugins.sh` — syncs `plugins/nebula/` into `~/.hermes/plugins/`. Does not migrate profiles.
@@ -90,6 +91,7 @@ Restart the process and start a new session.
 - Naming theme is cosmic/Latin (`nebula`, `nova`, `aurora`, ...). No `-abelion` suffixes, no external model-tier labels.
 - Test data is synthetic/local-only. No cloud accounts, no real credentials in tests. Public-known credential shapes are tested with fake bodies and must stay masked and non-restorable.
 - Every behavior change: edit the code, update the plugin's `docs/USAGE.md` status table and/or ideas docs, and add/change the matching test and/or E2E in the same commit. A behavior is "Proven" only when its E2E passes.
+- Always open a GitHub PR for every change, and never merge directly to `master`/`main` yourself: even one-line fixes go through a PR with review and a green CI gate before merging. Direct pushes to the default branch are reserved for admin-only accidents (e.g., dependabot rebases).
 
 ## Security and privacy rules for agents working here
 

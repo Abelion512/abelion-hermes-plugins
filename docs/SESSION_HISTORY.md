@@ -87,3 +87,10 @@ pytest plugins/nebula/e2e/test_privacy_wire.py -q --tb=short
 - Only use qwen3.5:0.8b with curl?, not use hermes for test mask (abelion -> mask -> username/cloud api free tier will use for train data so we must to protect our data privacy just in local no going out from local -> restore -> abelion)
 - U can improve for missing or wrong test for more stable the system.
 - Every create new plugins, use vibes @docs/title-reference.md
+
+## 10. 2026-11-06 — Skills + structure audit session (`chore/local-sync-before-archive`, PR #15)
+
+- Structure audit: folder placement is correct against `docs/PLUGIN_PLATFORM.md`; `validation/` is a legacy imported matrix (documented in its README) and is now also listed in AGENTS.md repo map. No `__pycache__` tracked.
+- Added two agent-facing skills per the platform skill template: `nebula-plugin-setup` (install, Tahap A optional masking, Tahap B required policy, rollback, disable, verification) and `nebula-plugin-debug` (reproduce → locate layer → root cause → failing-then-passing test). Both registered in `plugins/nebula/__init__.py`; test assertion and `docs/PLUGIN_SKILLS.md`, `docs/USAGE.md` updated in the same change.
+- AGENTS.md gained the PR rule: always open a PR, never merge directly to `master`/`main`.
+- CI: credential-guard rewritten (added-lines only, exemptions for pinned SHA / synthetic canary / action pins, no raw diff print). PR #15 was CONFLICTING after dependabot #14 merged; resolved by merging `origin/main` and keeping `plugins/screen` deleted. Suite green: 415 passed, 8 skipped, 1 deselected (known hardware-bound `test_pathological_inputs_do_not_blow_up`).

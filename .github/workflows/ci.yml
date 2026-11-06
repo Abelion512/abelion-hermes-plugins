@@ -84,7 +84,7 @@ jobs:
           diff = subprocess.check_output(["git", "diff", "--unified=0", f"{base}..HEAD"], text=True)
           print("diff_bytes=%d" % len(diff.encode("utf-8")))
           # Guard scans its own PR diff; constants are split so these lines never self-match.
-          pin = "9a85916c" + "c87d56c2ca00b02" + "fad8918f93ef1816e9"
+          pin = "9a85916c" + "87d56c2ca00b02" + "fad8918f93ef1816e9"
           canary = "ghp" + "_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2"
           suspicious = []
           for line in diff.splitlines():

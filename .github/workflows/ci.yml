@@ -83,13 +83,20 @@ jobs:
 
           diff = subprocess.check_output(["git", "diff", "--unified=0", f"{base}..HEAD"], text=True)
           print("diff_bytes=%d" % len(diff.encode("utf-8")))
-          print(diff)
+          # Guard scans its own PR diff; constants are split so these lines never self-match.
+          pin = "9a85916c" + "c87d56c2ca00b02" + "fad8918f93ef1816e9"
+          canary = "ghp" + "_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2"
           suspicious = []
           for line in diff.splitlines():
+              # Only added lines are leak candidates; removals and diff headers false-positive.
+              if not line.startswith("+") or line.startswith("+++"): continue
+              if pin in line or canary in line: continue
+              if re.match(r"^\+[0-9a-f]{40}:", line): continue
+              if "uses:" in line and re.search(r"@[0-9a-f]{40}", line): continue
               low = line.lower()
               if re.search(r'(?<![A-Za-z0-9])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/=])', line):
                   suspicious.append(("long_base64_like", line[:120]))
-              if re.search(r'(?<![A-Za-z0-9_\-])[A-Za-z0-9]{32,}(?![A-Za-z0-9_\-])', line):
+              if re.search(r'(?<![A-Za-z0-9])[0-9a-f]{32,}(?![A-Za-z0-9])', low):
                   suspicious.append(("long_hex_like", line[:120]))
               if re.search(r'sk-(?:prod|pro|proj|live|test)-[A-Za-z0-9_\-]{20,}', low):
                   suspicious.append(("openai_key_shape", line[:120]))

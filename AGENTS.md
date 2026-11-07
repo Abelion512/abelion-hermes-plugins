@@ -68,7 +68,7 @@ E2E is skipped when `HERMES_PYTHON` does not point at an importable Hermes insta
 
 ### Install into a Hermes profile
 
-Use `update-plugins.sh`. It expects the repo cloned at `$HOME/.hermes/abelion-hermes-plugins` and syncs `plugins/nebula/` into `~/.hermes/plugins/`. It does not migrate profiles, change privacy settings, or remove old installed plugins.
+Use `update-plugins.sh`. It expects the repo cloned at `$HOME/.hermes/abelion-hermes-plugins` and syncs `plugins/nebula/` into `~/.hermes/plugins/`. It stops before syncing if retired plugin directories remain. It does not migrate profiles, change privacy settings, or remove old installed plugins. Follow [the migration procedure](docs/PLUGIN_MIGRATION.md) before upgrading an existing profile.
 
 For a disposable test profile with required mode:
 

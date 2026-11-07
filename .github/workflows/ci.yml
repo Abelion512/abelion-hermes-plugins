@@ -62,6 +62,14 @@ jobs:
   # Strict pre-merge credential guard: a PR that introduces a leaked secret, a
   # missing plugin manifest, or a bare provider-supplied key shape must not
   # become mergeable through labeling or review alone.
+  # Protect existing Hermes profiles from stale plugin copies after a source rename.
+  plugin-migration-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: test legacy-install preflight
+        run: bash tests/test_update_plugins_migration.sh
+
   credential-guard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

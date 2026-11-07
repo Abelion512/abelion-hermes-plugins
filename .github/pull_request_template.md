@@ -1,5 +1,5 @@
-<!-- Setiap PR WAJIB mengisi kedua kolom di bawah ini sebelum request review.
-     PR tanpa jawban Fungsi + Kenapa harus merge = belum siap review. -->
+<!-- Setiap PR WAJIB mengisi bagian Fungsi, Alasan merge, dan Bukti verifikasi sebelum request review. Workflow pr-body-check akan menolak bagian yang kosong.
+     PR tanpa jawaban Fungsi + Kenapa harus merge = belum siap review. -->
 
 ## Fungsi apa yang dibawa PR ini?
 

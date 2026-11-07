@@ -6,8 +6,7 @@ A monorepo for standalone Hermes Agent plugins. Each plugin owns its implementat
 
 | Plugin | Runtime ID | Source | Responsibility |
 |---|---|---|---|
-| Privacy Guard | `pii-mask-abelion` | [`plugins/pii_mask_abelion/`](plugins/pii_mask_abelion/) | Session-local PII/credential masking, permitted placeholder restoration, and held output redaction. |
-| Bot Screen | `screen` | [`plugins/screen/`](plugins/screen/) | Dashboard for the agent's virtual desktop and a capability-gated human input lease. |
+| Privacy Guard | `nebula` | [`plugins/nebula/`](plugins/nebula/) | Session-local PII/credential masking, permitted placeholder restoration, and held output redaction. |
 
 Each plugin folder contains its own `README.md`, `docs/`, `tests/`, `e2e/`, and `skills/` as applicable. The repository root retains only shared metadata and entry points such as `hermes.json`, `update-plugins.sh`, this README, and GitHub configuration.
 
@@ -17,18 +16,12 @@ Feature policy and UI stay in the plugin repository. Host-wide enforcement, auth
 
 - **Privacy Guard plugin:** credential/PII/path classification, session-local token mapping, bounded restoration, policy configuration, skills, and regression tests.
 - **Hermes core:** provider/tool interception, mandatory fail-closed policy gates, session lifecycle, held-stream semantics, and stable native redaction contracts.
-- **Bot Screen plugin:** Screen tab, noVNC presentation, display RPC allowlist, and takeover/hand-back UX.
-- **Hermes core:** plugin discovery/API mounting, dashboard HTTP/WebSocket authorization, capability and consent checks, profile isolation, and virtual-desktop/lease authority.
-
-Bot Screen's lease governs virtual-desktop input only. **It is not general human-in-the-loop (HITL): it does not pause all agent tools or require human approval for arbitrary actions.** General HITL must be designed as a separate core-owned execution/approval gate, with any UI kept in a plugin.
 
 The standalone `decolua/9router` project owns its router implementation. This repository does not vendor or maintain a duplicate adapter.
 
 ## Security and compatibility
 
 Mandatory Privacy Guard behavior requires the exact Hermes fork commit `9a85916c87d56c2ca00b02fad8918f93ef1816e9` from [`Abelion512/hermes-4gent`](https://github.com/Abelion512/hermes-4gent). CI checks out that commit for real-host tests. This does not certify stock Hermes, prove upstream adoption, or provide a process-wide network firewall. Detection remains heuristic, and unsupported transports are not universally covered.
-
-Bot Screen is for the agent's virtual desktop, not the user's personal display. Browser/display E2E tests do not certify model-driven computer use, phone/Tailscale access, abrupt-disconnect behavior, or an installed laptop.
 
 ## Validation
 
@@ -44,6 +37,6 @@ The “2.8T” target is not treated as a count of test cases or as a privacy gu
 
 ## Installation and migration
 
-`update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`; it does not migrate an installed profile, change its privacy settings, or remove old installed plugins. Review the target profile, stop the running Hermes process, back up its config and plugin versions, then use native plugin management for removals. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
+`update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`. It now stops before pulling or syncing if it detects the retired `pii_mask_abelion`, `screen`, or `output-redact-abelion` directories. It does not guess the active profile, edit Hermes configuration, or delete plugin state. Complete the backed-up native migration and quarantine procedure in [`docs/PLUGIN_MIGRATION.md`](docs/PLUGIN_MIGRATION.md) first. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
 
 Retired source can be recovered from Git history as documented in [`.github/retired-source-recovery.md`](.github/retired-source-recovery.md). An old installed copy is separate state and is not deleted merely because its source was removed from this repository.

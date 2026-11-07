@@ -1,0 +1,34 @@
+# Plugin-local labels for nebula.
+# These supplement the repo labeler for paths and concerns belonging to this
+# plugin only.
+#
+# Priority labels are intentionally not defined here. Priority is a triage/intent
+# judgment, not a changed-file pattern. See ../../../docs/PRIORITY_LABELS.md.
+
+todo:
+  - changed-files:
+      - any-glob-to-any-file: "TODO.md"
+
+plugin-docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "README.md"
+          - "docs/**"
+          - "skills/**"
+          - "plugin.yaml"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+e2e:
+  - changed-files:
+      - any-glob-to-any-file: "e2e/**"
+
+validation:
+  - changed-files:
+      - any-glob-to-any-file: "validation/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"

@@ -1,0 +1,26 @@
+# Plugin-local labels (optional).
+#
+# If this file exists, repo labeler will read it for paths inside this plugin
+# folder and merge them into the repo label set. The repo labeler does not own
+# these labels by default; this file helps future plugins self-document their
+# owned paths without touching the top-level labeler every time.
+#
+# Example use:
+#
+# todo:
+#   - changed-files:
+#       - any-glob-to-any-file: "TODO.md"
+#
+# feature-tests:
+#   - changed-files:
+#       - any-glob-to-any-file: "tests/**"
+#
+# feature-e2e:
+#   - changed-files:
+#       - any-glob-to-any-file: "e2e/**"
+
+# Add plugin-owned labels below when a plugin wants them.
+#
+# Priority labels are intentionally not defined here by default.
+# Priority is a triage/intent judgment, not a changed-file pattern, so it
+# should not be auto-applied from plugin paths. See ../../docs/PRIORITY_LABELS.md.

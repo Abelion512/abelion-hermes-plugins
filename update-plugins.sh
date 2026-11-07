@@ -23,8 +23,8 @@ for id in "${LEGACY_PLUGIN_IDS[@]}"; do
 done
 
 if [ "${#found_legacy[@]}" -gt 0 ]; then
-  printf 'Legacy Hermes plugin installation detected under %s:\\n' "$PLUGIN_DIR" >&2
-  printf '  - %s\\n' "${found_legacy[@]}" >&2
+  printf 'Legacy Hermes plugin installation detected under %s:\n' "$PLUGIN_DIR" >&2
+  printf '  - %s\n' "${found_legacy[@]}" >&2
   cat >&2 <<'MESSAGE'
 
 Update stopped before pulling or syncing anything. This script will not guess

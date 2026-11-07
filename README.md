@@ -40,3 +40,13 @@ The “2.8T” target is not treated as a count of test cases or as a privacy gu
 `update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`. It now stops before pulling or syncing if it detects the retired `pii_mask_abelion`, `screen`, or `output-redact-abelion` directories. It does not guess the active profile, edit Hermes configuration, or delete plugin state. Complete the backed-up native migration and quarantine procedure in [`docs/PLUGIN_MIGRATION.md`](docs/PLUGIN_MIGRATION.md) first. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
 
 Retired source can be recovered from Git history as documented in [`.github/retired-source-recovery.md`](.github/retired-source-recovery.md). An old installed copy is separate state and is not deleted merely because its source was removed from this repository.
+
+## Repo tooling and agent skills
+
+Shared repeating-task helpers keep plugin maintenance consistent:
+
+- `.github/task-templates/`: templates for plugin creation, CI/labeler, docs, skills, tests, and review-before-merge.
+- `.plugins/`: agent-facing skills for plugin creation, use, debugging/reproduction, and testing.
+- `.github/triage-priority.md`: ownership and impact-based priority guidance.
+
+These files are workflow guidance, not runtime behavior. A task template does not replace code review, tests, or evidence for the behavior being claimed.

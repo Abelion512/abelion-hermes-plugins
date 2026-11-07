@@ -37,6 +37,6 @@ The “2.8T” target is not treated as a count of test cases or as a privacy gu
 
 ## Installation and migration
 
-`update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`; it does not migrate an installed profile, change its privacy settings, or remove old installed plugins. Review the target profile, stop the running Hermes process, back up its config and plugin versions, then use native plugin management for removals. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
+`update-plugins.sh` syncs the active plugin folders into `~/.hermes/plugins/`. It now stops before pulling or syncing if it detects the retired `pii_mask_abelion`, `screen`, or `output-redact-abelion` directories. It does not guess the active profile, edit Hermes configuration, or delete plugin state. Complete the backed-up native migration and quarantine procedure in [`docs/PLUGIN_MIGRATION.md`](docs/PLUGIN_MIGRATION.md) first. Never delete plugin directories from a live profile, and never disable required Privacy Guard merely to hide a migration failure.
 
 Retired source can be recovered from Git history as documented in [`.github/retired-source-recovery.md`](.github/retired-source-recovery.md). An old installed copy is separate state and is not deleted merely because its source was removed from this repository.

@@ -333,7 +333,7 @@ _AUTH_KEYS = frozenset({"authorization", "proxy-authorization"})
 
 def mask_value_for_key(key: str, value: str) -> tuple[str, int]:
     """Structured data: the field name is a separate dict key, so decide by key. (value, changes)."""
-    if not value or _looks_like_reference(value):
+    if not isinstance(value, str) or not value or _looks_like_reference(value):
         return value, 0
     low = key.lower()
     if low in _AUTH_KEYS:

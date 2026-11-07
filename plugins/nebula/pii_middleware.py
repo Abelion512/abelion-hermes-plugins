@@ -157,6 +157,13 @@ def _mask_json_string(text: str):
 
 _MAX_DEPTH = 64
 _UNSUPPORTED = "[REDACTED]_UNSUPPORTED_STRUCTURE"
+# Fail-closed request when masking cannot produce a sendable payload.
+# No model + marker content: the provider rejects it, nothing sensitive leaves.
+HELD_REQUEST: dict[str, Any] = {
+    "model": "",
+    "messages": [{"role": "user", "content": "[GUARD_WITHHELD]"}],
+    "stream": False,
+}
 
 
 def _mask_deep(value: Any, key: str):
@@ -258,7 +265,9 @@ def pii_middleware(
         fallback, _ = _mask_deep(request, "")
         if isinstance(fallback, dict):
             return {"request": fallback}
-        return None
+        # The round trip cannot produce a request (non-serialisable input or masking that
+        # broke the JSON structure): never fall through to the original, fail closed instead.
+        return {"request": HELD_REQUEST}
     if total_masked == 0:
         return None
     logger.info("[PII] Masked %d items in request (level=%s)", total_masked, CONFIDENTIAL)

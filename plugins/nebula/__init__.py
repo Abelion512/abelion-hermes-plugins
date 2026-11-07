@@ -1,5 +1,9 @@
 """Local request guard with session mapping and held final delivery."""
+import logging
+
 from .guard import GUARD
+
+logger = logging.getLogger(__name__)
 
 def register(ctx):
     # Refuse legacy hosts rather than silently running a leaking stream transform.
@@ -27,11 +31,22 @@ def register(ctx):
     register_skill = getattr(ctx, 'register_skill', None)
     if callable(register_skill):
         from pathlib import Path
-        register_skill('privacy-mask-placeholders', Path(__file__).parent / 'skills' / 'privacy-mask-placeholders' / 'SKILL.md',
-                       'Work with masked PII, credential and path placeholders.')
-        register_skill('redacted-output-handling', Path(__file__).parent / 'skills' / 'redacted-output-handling' / 'SKILL.md',
-                       'Handle responses passed through credential redaction.')
-        register_skill('nebula-plugin-setup', Path(__file__).parent / 'skills' / 'nebula-plugin-setup' / 'SKILL.md',
-                       'Set up, enable, roll back, and disable the nebula plugin.')
-        register_skill('nebula-plugin-debug', Path(__file__).parent / 'skills' / 'nebula-plugin-debug' / 'SKILL.md',
-                       'Debug and reproduce nebula Privacy Guard failures.')
+        skills_dir = Path(__file__).parent / 'skills'
+        # Skill surface is advisory: a missing file or a raising host API must not
+        # abort core middleware registration. Skip one failure, keep the rest.
+        for name, description in (
+            ('privacy-mask-placeholders', 'Work with masked PII, credential and path placeholders.'),
+            ('redacted-output-handling', 'Handle responses passed through credential redaction.'),
+            ('nebula-plugin-setup', 'Set up, enable, roll back, and disable the nebula plugin.'),
+            ('nebula-plugin-debug', 'Debug and reproduce nebula Privacy Guard failures.'),
+        ):
+            path = skills_dir / name / 'SKILL.md'
+            if not path.is_file():
+                logger.warning("Skipping missing optional skill file: %s", path)
+                continue
+            try:
+                register_skill(name, path, description)
+            except Exception:
+                # Skill discovery is optional, but registration failures must be
+                # visible to maintainers while core privacy hooks remain active.
+                logger.exception("Failed to register optional Nebula skill %s", name)

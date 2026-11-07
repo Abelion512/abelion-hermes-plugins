@@ -23,5 +23,6 @@ Plugin skill coverage is documented in [`PLUGIN_SKILLS.md`](PLUGIN_SKILLS.md). I
 | Placeholders are restored only to authorized local destinations, never sent back to the cloud | Documented local path slots only | **Not covered by an E2E** (UNRUN) |
 | Public text without a private value stays unchanged | Yes | Yes (benign text) |
 | Keep case, typo, session-bound and destination limits | Per README | Not covered by an E2E |
+| Missing host symbols, missing payload fields, failed skill registration and broken middleware masking always fail closed (withheld or denied, never unmasked, never a host crash) | Yes (see README "Missing and failing inputs"; [tests](../tests/test_robustness.py)) | Not covered by an E2E |
 
 Build or change this feature: edit the code, update this table, and change or add the matching test in the same commit. A behavior moves to "Proven" only when its E2E passes; a failing E2E stays failing and is listed here.

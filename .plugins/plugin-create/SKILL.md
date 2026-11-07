@@ -12,7 +12,7 @@ metadata:
 
 This repo is a monorepo for standalone Hermes Agent plugins. Every plugin owns its implementation, docs, unit tests, skills, and feature-specific E2E. This skill is how you add a new plugin folder and wire it into the shared metadata, CI, labeler, and README without leaving the repo half-updated.
 
-Use this when the user asks to add a plugin, or when a feature clearly belongs in a new plugin rather than bolting onto `nebula` or `screen`.
+Use this when the user asks to add a plugin, or when a feature clearly belongs in a new plugin rather than bolting onto an unrelated existing plugin.
 
 ## When to Use
 

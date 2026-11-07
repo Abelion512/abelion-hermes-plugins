@@ -1,3 +1,37 @@
+# Priority labels. Risk labels are based on changed files; the reviewer bot
+# may add/escalate labels from its advisory review. Labels never approve a PR.
+P0:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/nebula/guard.py"
+          - "plugins/nebula/pii_middleware.py"
+          - "plugins/nebula/output_redact.py"
+          - "plugins/nebula/_credentials.py"
+          - "plugins/nebula/_patterns.py"
+P1:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/**/plugin.yaml"
+          - "plugins/**/plugin.py"
+          - "plugins/**/main*.py"
+          - "hermes.json"
+P2:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/**/tests/**"
+          - "plugins/**/e2e/**"
+          - "tests/**"
+P3:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/scripts/**"
+P4:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**.md"
+
 # Applied by .github/workflows/labeler.yml.
 # Shared labels only; plugin-specific ownership labels live in plugins/<id>/.github/labels.yml.
 

@@ -25,6 +25,10 @@ plugin name only.
    belongs in the plugin's own docs/skills, not only in repo-level notes.
 6. **Owned status.** Ideas, features, gaps, known failures, and skipped paths
    must be recorded in that plugin's docs, not only in chat or PRs.
+7. **PR comment.** Every PR must answer, in its comment (template
+   `.github/pull_request_template.md`): **Fungsi apa yang dibawa PR ini?**
+   and **Kenapa harus saya merge?**, with one real evidence line per claim
+   (`TERVERIFIKASI`/`PERKIRAAN`/`GAGAL`). Stacked PRs state the merge order.
 
 ## Platform goals
 

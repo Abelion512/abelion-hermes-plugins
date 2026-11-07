@@ -92,6 +92,7 @@ Restart the process and start a new session.
 - Test data is synthetic/local-only. No cloud accounts, no real credentials in tests. Public-known credential shapes are tested with fake bodies and must stay masked and non-restorable.
 - Every behavior change: edit the code, update the plugin's `docs/USAGE.md` status table and/or ideas docs, and add/change the matching test and/or E2E in the same commit. A behavior is "Proven" only when its E2E passes.
 - Always open a GitHub PR for every change, and never merge directly to `master`/`main` yourself: even one-line fixes go through a PR with review and a green CI gate before merging. Direct pushes to the default branch are reserved for admin-only accidents (e.g., dependabot rebases).
+- Every PR must fill the mandatory comment (see `.github/pull_request_template.md`): **Fungsi apa yang dibawa PR ini?** and **Kenapa harus saya merge?**, plus one real evidence line per claim (`TERVERIFIKASI`/`PERKIRAAN`/`GAGAL`). A PR without those two answers is not ready for review, even if CI is green. If the PR is stacked, state the merge order (which PR merges first).
 
 ## Security and privacy rules for agents working here
 

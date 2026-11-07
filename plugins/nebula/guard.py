@@ -117,10 +117,11 @@ class Guard:
         for pat in (cred.TOKEN_SHAPES,cred.TELEGRAM_TOKEN,cred.DISCORD_TOKEN,PEM):
             for m in pat.finditer(text): add(*m.span(),'SECRET')
         # Hermes' native fixed-prefix detector: complete span, never its partial display mask.
+        # A host that renames the symbol or changes its type degrades to local patterns only.
         try:
             from agent.redact import _PREFIX_RE
             for m in _PREFIX_RE.finditer(text): add(*m.span(),'SECRET')
-        except ImportError: pass
+        except (ImportError, AttributeError): pass
         for m in re.finditer(r'--(?P<name>[A-Za-z][A-Za-z0-9_.%\-]{1,100})[ =](?P<value>"[^"\n]*"|\'[^\'\n]*\'|[^\s"\',;&<>{}\[\]()]+)',text):
             name=unquote(unquote(m["name"].lstrip("-")))
             if cred.classify_field(name) or name.lower() in AUTH_KEYS or LABEL.fullmatch(name):
@@ -366,7 +367,11 @@ class Guard:
                 return {'allow':True,'args':args}
             except Exception:return {'allow':False}
         if phase=='output':
-            return {'allow':True,'response_text':self.output(**payload)}
+            # Missing/raised payload fields must not surface into the host; withheld text is safe.
+            try:
+                return {'allow':True,'response_text':self.output(**payload)}
+            except Exception:
+                return {'allow':True,'response_text':MARKER}
         return {'allow':False}
 
     @staticmethod
@@ -479,6 +484,9 @@ class Guard:
             return {'action':'block','message':'Privacy placeholder unresolved or destination not allowed.'}
 
     def close(self,session_id='',**kwargs):
-        with self.lock:self.sessions.pop(session_id,None)
+        try:
+            with self.lock:self.sessions.pop(session_id,None)
+        except Exception:
+            pass  # teardown must never break the host session loop
 
 GUARD=Guard()

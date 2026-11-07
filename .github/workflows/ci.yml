@@ -59,9 +59,6 @@ jobs:
           json=$(printf '%s\n' "$sel" | sed '/^$/d' | sort -u | jq -R . | jq -sc .)
           echo "plugins=$json" | tee -a "$GITHUB_OUTPUT"
 
-  # Strict pre-merge credential guard: a PR that introduces a leaked secret, a
-  # missing plugin manifest, or a bare provider-supplied key shape must not
-  # become mergeable through labeling or review alone.
   # Protect existing Hermes profiles from stale plugin copies after a source rename.
   plugin-migration-guard:
     runs-on: ubuntu-latest
@@ -70,6 +67,9 @@ jobs:
       - name: test legacy-install preflight
         run: bash tests/test_update_plugins_migration.sh
 
+  # Strict pre-merge credential guard: a PR that introduces a leaked secret, a
+  # missing plugin manifest, or a bare provider-supplied key shape must not
+  # become mergeable through labeling or review alone.
   credential-guard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

@@ -1,0 +1,45 @@
+name: pr-body-check
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  required-pr-sections:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require non-empty PR rationale and verification
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          body = os.environ.get("PR_BODY", "")
+          visible = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+          headings = [
+              "Fungsi apa yang dibawa PR ini?",
+              "Kenapa harus saya merge?",
+              "Bukti verifikasi",
+          ]
+          missing = []
+          for index, heading in enumerate(headings):
+              match = re.search(
+                  rf"(?m)^##\\s+{re.escape(heading)}\\s*\\n(.*?)(?=^##\\s+|\\Z)",
+                  visible,
+                  flags=re.S,
+              )
+              if not match or not match.group(1).strip():
+                  missing.append(heading)
+          if missing:
+              print("::error::PR body is incomplete. Fill these sections:")
+              for heading in missing:
+                  print(f"::error::  - {heading}")
+              sys.exit(1)
+          print("Required PR sections are present and non-empty.")
+          PY

@@ -18,7 +18,7 @@ Plugin skill coverage is documented in [`PLUGIN_SKILLS.md`](PLUGIN_SKILLS.md). I
 |---|---|---|
 | Mask recognized private values in ordinary main-chat requests | Optional `llm_request`/`llm_execution` plugin middleware | Main request: yes; E2E only certifies the synthetic cases listed below |
 | Enforce the required local policy before supported provider egress | Requires the matching `agent.privacy_guard` contract in the pinned Hermes core; unsupported stock hosts must reject this guarantee | Required-mode E2E records the actual loopback provider bodies, including auxiliary title requests; see current CI run before describing this as passing |
-| Optional mode protects auxiliary/title traffic | Not guaranteed by optional request middleware | No; enable required mode with the matching core if auxiliary egress must be guarded |
+| Optional mode protects auxiliary/title traffic | Not guaranteed by optional request middleware; `register()` warns when the pinned required-policy core is absent or inactive | No; enable required mode with the matching core if auxiliary egress must be guarded |
 | Tool results are masked before they reach the model | Yes | Yes (replay of a tool result) |
 | Placeholders are restored only to authorized local destinations, never sent back to the cloud | Documented local path slots only | **Not covered by an E2E** (UNRUN) |
 | Public text without a private value stays unchanged | Yes | Yes (benign text) |

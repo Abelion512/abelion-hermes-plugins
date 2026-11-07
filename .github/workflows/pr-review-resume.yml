@@ -1,0 +1,46 @@
+name: pr-review-resume
+
+on:
+  schedule:
+    # 00:15 UTC = 07:15 WIB, just after the OpenRouter free daily reset.
+    - cron: "15 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  resume:
+    name: Resume queued reviews
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base (workflow + scripts only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: |
+            .github/scripts
+            docs/pr-review-prompt.md
+
+      - name: Re-run queued PRs at their latest head SHA
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -e
+          prs=$(gh pr list --repo "$GH_REPO" --state open --json number,headRefOid --jq '.[] | "\(.number) \(.headRefOid)"')
+          while read -r pr sha; do
+            [ -z "$pr" ] && continue
+            last=$(gh api "repos/$GH_REPO/issues/$pr/comments?per_page=100" \
+              --jq 'map(select(.user.login == "github-actions[bot]" and ((.body // "") | contains("pr-review-bot")))) | last | .body // ""')
+            case "$last" in
+              *"pr-review-bot:queued"*)
+                echo "Resuming PR #$pr at $sha"
+                gh pr diff "$pr" --repo "$GH_REPO" > /tmp/pr-$pr.diff
+                python3 .github/scripts/pr-review.py \
+                  --pr "$pr" --diff "/tmp/pr-$pr.diff" --repo "$GH_REPO" \
+                  --head-sha "$sha" || true
+                ;;
+            esac
+          done <<< "$prs"

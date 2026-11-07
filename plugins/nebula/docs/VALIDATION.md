@@ -13,6 +13,7 @@ Invalid capacity/TTL values raise before state exists. Wrong request, model or t
 | `tests/test_pii_middleware.py` | PII middleware request walk, schema defaults, headers/extra_body, private key blocks | `pytest plugins/nebula/tests/test_pii_middleware.py -q --tb=short` |
 | `tests/test_consolidated_privacy.py` | Exactly one active plugin manifest, native output redaction + CLI restore | `pytest plugins/nebula/tests/test_consolidated_privacy.py -q --tb=short` |
 | `tests/test_guard_runtime.py` | Runtime placeholder round trip, required oversize denial, cookie boundary | `pytest plugins/nebula/tests/test_guard_runtime.py -q --tb=short` |
+| `tests/test_robustness.py` | Missing native detector symbols, missing payload fields, unhashable session ids, skill registration failures, fail-closed middleware fallback, non-string structured values | `pytest plugins/nebula/tests/test_robustness.py -q --tb=short` |
 | `e2e/test_privacy_wire.py` | Real Hermes process + loopback provider egress (requires Hermes runtime) | `pytest plugins/nebula/e2e/test_privacy_wire.py -q --tb=short` |
 
 ## Known skipped paths

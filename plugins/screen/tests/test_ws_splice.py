@@ -73,6 +73,27 @@ def test_splice_echo_and_clean_close(plugin, upstream):
     assert "clean" in upstream.display_conns.values(), upstream.display_conns
 
 
+def test_oversized_browser_frame_rejected_with_1009(plugin, upstream):
+    """Regression (scan cand_51fc48): a browser frame larger than the
+    16 MiB MAX_WS_FRAME cap must be rejected and never forwarded
+    upstream - previously down() forwarded any size. In this stack the
+    rejection may come from the transport layer (uvicorn/websockets
+    max_size) before the app-level check runs; either way the frame
+    must not reach upstream (no echo back)."""
+    _observe(plugin)
+    ws = websocket.create_connection(_ws_url(plugin), timeout=10)
+    try:
+        ws.send_binary(b"x" * (16 * 1024 * 1024 + 1))
+    except (BrokenPipeError, websocket.WebSocketConnectionClosedException):
+        return  # rejected at transport layer; never reached upstream
+    try:
+        code, reason = _close_code(ws)
+    except websocket.WebSocketConnectionClosedException:
+        return
+    assert code == 1009, (code, reason)
+    ws.close()
+
+
 def _close_code(ws):
     """Read the next frame and return (code, reason) of a CLOSE frame."""
     frame = ws.recv_frame()

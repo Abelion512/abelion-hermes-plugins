@@ -77,7 +77,7 @@ jobs:
         env:
           P: ${{ matrix.plugin }}
         run: |
-          python -m pip install pip-audit pytest
+          python -m pip install pip-audit==2.10.1 pytest==9.1.1
           for f in "$P"/tests/requirements*.txt; do
             [ -f "$f" ] && python -m pip install -r "$f"
           done

@@ -465,6 +465,12 @@ async def display_ws(ws: WebSocket):
             if m["type"] == "websocket.disconnect":
                 clean = (m.get("code") or 1005) in (1000, 1001)
                 return
+            payload = m.get("bytes")
+            if payload is None:
+                payload = m.get("text")
+            if payload is not None and len(payload) > MAX_WS_FRAME:
+                await ws.close(code=1009, reason="frame too large")
+                return
             if m.get("bytes") is not None:
                 await up.send_bytes(m["bytes"])
             elif m.get("text") is not None:

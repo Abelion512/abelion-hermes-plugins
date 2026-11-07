@@ -50,11 +50,24 @@ Not a firewall or prompt-injection solution. Direct tool/service traffic (curl, 
 
 ## Skills overview
 
-The plugin registers `nebula:privacy-mask-placeholders` through native `ctx.register_skill`, exposed in `skills_list`, `skill_view` and the `<available_skills>` index while enabled. Older hosts without that API skip it. See [usage](docs/USAGE.md), [skills coverage](docs/PLUGIN_SKILLS.md), and the skill ([skills/privacy-mask-placeholders/SKILL.md](skills/privacy-mask-placeholders/SKILL.md)). The redacted-output-handling skill is at [skills/redacted-output-handling/SKILL.md](skills/redacted-output-handling/SKILL.md).
+The plugin registers `nebula:privacy-mask-placeholders` through native `ctx.register_skill`, exposed in `skills_list`, `skill_view` and the `<available_skills>` index while enabled. Older hosts without that API skip it. See [usage](docs/USAGE.md), [skills coverage](docs/PLUGIN_SKILLS.md), and the skill ([skills/privacy-mask-placeholders/SKILL.md](skills/privacy-mask-placeholders/SKILL.md)). The redacted-output-handling skill is at [skills/redacted-output-handling/SKILL.md](skills/redacted-output-handling/SKILL.md). All four bundled skills (`privacy-mask-placeholders`, `redacted-output-handling`, `nebula-plugin-setup`, `nebula-plugin-debug`) file-skip individually on registration failure; missing one never blocks the others or the middleware.
 
 ## Input and requirement validation
 
 See [ordered validation](docs/VALIDATION.md) for the runtime branches and failure outcomes.
+
+## Missing and failing inputs
+
+The guard fails closed, never crashes the host, and never falls through to unmasked content:
+
+- A host that renames or reshapes the native `agent.redact._PREFIX_RE` detector degrades to the plugin's own rules; masking continues.
+- A required-policy `output` call with a missing payload field is answered with withheld text instead of raising.
+- `on_session_end` cleanup tolerates unusable session identities.
+- Skill registration never blocks core middleware: a missing `SKILL.md` file or a raising host API skips one skill and registers the rest. Masking is unaffected.
+- `pii_middleware` remnant path: when the request walk fails and the JSON round trip cannot produce a sendable payload, a held stub request (no model, marker content) is returned. The original request is never sent raw.
+
+`nebula/pii_middleware.py` is a standalone optional middleware (`PUBLIC`/`INTERNAL`/`CONFIDENTIAL` levels, copy-on-write masking with `[REDACTED]` markers). The consolidated plugin does **not** auto-register it; `register()` wires the guard's own `llm_request` path (`optional_request`). Register `pii_middleware` explicitly if you want that layering, and expect both layers then apply. It is exercised by `tests/test_pii_middleware.py`, `tests/test_credentials.py` and `validation/run_matrix.py`.
+
 
 ## Native route boundary
 

@@ -30,7 +30,7 @@ jobs:
           missing = []
           for index, heading in enumerate(headings):
               match = re.search(
-                  rf"(?m)^##\\s+{re.escape(heading)}\\s*\\n(.*?)(?=^##\\s+|\\Z)",
+                  r"(?m)^##\s+" + re.escape(heading) + r"\s*\n(.*?)(?=^##\s+|\Z)",
                   visible,
                   flags=re.S,
               )

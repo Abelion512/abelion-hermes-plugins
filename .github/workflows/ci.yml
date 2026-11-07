@@ -302,6 +302,7 @@ jobs:
           CHROME_ZIP="$RUNNER_TEMP/chrome-for-testing-${CHROME_FOR_TESTING_VERSION}.zip"
           CHROME_ROOT="$RUNNER_TEMP/chrome-for-testing-${CHROME_FOR_TESTING_VERSION}"
           curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_FOR_TESTING_VERSION}/linux64/chrome-linux64.zip" -o "$CHROME_ZIP"
+          echo "855d228f4918b9e21b059a3ab6785a2217489dc570d220d73c4fa667c83b4582  $CHROME_ZIP" | sha256sum -c -
           rm -rf "$CHROME_ROOT"
           mkdir -p "$CHROME_ROOT"
           unzip -q "$CHROME_ZIP" -d "$CHROME_ROOT"

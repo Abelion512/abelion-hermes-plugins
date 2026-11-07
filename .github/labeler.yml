@@ -1,3 +1,12 @@
+# Plugin registration: catalog entry or plugin manifest added/changed.
+# A new plugin registers by adding plugins/<id>/ plus a hermes.json entry;
+# this labels those PRs without hardcoding each plugin.
+plugin-registry:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "hermes.json"
+          - "plugins/*/plugin.yaml"
+
 # Applied by .github/workflows/labeler.yml.
 # Shared labels only; plugin-specific ownership labels live in plugins/<id>/.github/labels.yml.
 
@@ -36,4 +45,4 @@ security-audit:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/e2e_support/**"
-          - "plugins/nebula/validation/**"
+          - "plugins/**/validation/**"

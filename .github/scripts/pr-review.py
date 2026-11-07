@@ -117,9 +117,13 @@ def gh(*args, check=False):
 
 def find_bot_comment(pr: str, repo: str) -> dict | None:
     """Latest comment carrying a bot marker, or None."""
-    out = gh("api", f"repos/{repo}/issues/{pr}/comments?per_page=100")
+    # --paginate follows GitHub's Link headers; --slurp keeps each response
+    # page as an array so the newest matching comment can win across pages.
+    out = gh("api", f"repos/{repo}/issues/{pr}/comments?per_page=100",
+             "--paginate", "--slurp")
     try:
-        comments = json.loads(out)
+        pages = json.loads(out)
+        comments = [comment for page in pages for comment in page]
     except Exception:
         return None
     for c in reversed(comments):

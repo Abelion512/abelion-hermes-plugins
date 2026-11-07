@@ -179,8 +179,56 @@ class ReviewTests(unittest.TestCase):
             "body": f"<!-- pr-review-bot -->\nLast reviewed commit: {SHA}",
             "user": {"login": "Abelion512", "type": "User"},
         }
-        with mock.patch.object(pr_review, "gh", return_value=json.dumps([attacker])):
+        with mock.patch.object(pr_review, "gh", return_value=json.dumps([[attacker]])):
             self.assertIsNone(pr_review.find_bot_comment("19", "o/r"))
+
+    def test_bot_comment_on_later_pages_is_found(self):
+        human = {"id": 1, "body": "ordinary comment",
+                 "user": {"login": "someone"}}
+        older = {"id": 101, "body": pr_review.BOT_MARK + " old",
+                 "user": {"login": pr_review.BOT_LOGIN}}
+        latest = {"id": 205, "body": pr_review.QUEUE_MARK,
+                  "user": {"login": pr_review.BOT_LOGIN}}
+        forged = {"id": 206, "body": pr_review.BOT_MARK,
+                  "user": {"login": "someone"}}
+        pages = [[human] * 100, [older] + [human] * 99,
+                 [latest, forged]]
+        with mock.patch.object(pr_review, "gh", return_value=json.dumps(pages)) as gh:
+            found = pr_review.find_bot_comment("19", "o/r")
+        self.assertEqual(found, {"id": 205, "body": pr_review.QUEUE_MARK})
+        gh.assert_called_once_with(
+            "api", "repos/o/r/issues/19/comments?per_page=100",
+            "--paginate", "--slurp")
+
+    def test_paginated_review_updates_existing_comment(self):
+        human = {"id": 1, "body": "ordinary", "user": {"login": "someone"}}
+        previous = {"id": 101, "body": pr_review.BOT_MARK +
+                    "\nLast reviewed commit: " + "b" * 40,
+                    "user": {"login": pr_review.BOT_LOGIN}}
+        pages = [[human] * 100, [previous]]
+        with mock.patch.object(pr_review, "gh", return_value=json.dumps(pages)) as gh, \
+             mock.patch.object(pr_review, "call_openrouter", return_value=resp_ok()), \
+             mock.patch.object(pr_review, "label"), \
+             mock.patch.object(sys, "argv", self.argv), \
+             mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "k"}, clear=True):
+            self.assertEqual(pr_review.main(), 0)
+        writes = [c.args for c in gh.call_args_list if "-X" in c.args]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0][:4],
+                         ("api", "repos/o/r/issues/comments/101", "-X", "PATCH"))
+        self.assertFalse(any(c.args[:2] == ("pr", "comment") for c in gh.call_args_list))
+
+    def test_paginated_same_sha_skips_provider_and_write(self):
+        human = {"id": 1, "body": "ordinary", "user": {"login": "someone"}}
+        previous = {"id": 101, "body": pr_review.BOT_MARK +
+                    "\nLast reviewed commit: " + SHA,
+                    "user": {"login": pr_review.BOT_LOGIN}}
+        with mock.patch.object(pr_review, "gh", return_value=json.dumps([[human] * 100, [previous]])) as gh, \
+             mock.patch.object(pr_review, "call_openrouter") as call, \
+             mock.patch.object(sys, "argv", self.argv):
+            self.assertEqual(pr_review.main(), 0)
+        call.assert_not_called()
+        self.assertEqual(gh.call_count, 1)
 
     def test_no_approve_path_exists(self):
         src = open(os.path.join(os.path.dirname(__file__), "pr-review.py")).read()

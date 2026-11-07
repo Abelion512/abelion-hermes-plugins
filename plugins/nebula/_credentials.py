@@ -51,7 +51,10 @@ DISCORD_TOKEN = re.compile(r"\b[MNO][A-Za-z0-9_\-]{23,25}\.[A-Za-z0-9_\-]{6}\.[A
 # ── 2. Field-name driven masking ─────────────────────────────────────────
 # name, separator (quotes allowed so JSON/headers/query/env/CLI all fit), value.
 # Name is bounded to 64 chars; the value excludes whitespace and delimiters.
-_NAME = r"[A-Za-z](?:[A-Za-z0-9_.\-]|%(?:25)?(?:5[Ff]|2[DdEe])){1,63}"  # %5F / %2D / %2E: URL-encoded _ - .
+# Name is atomic (?>...): separator chars are disjoint from name chars and the
+# name can never bind to sep's "%3D" prefix, so shortening the name can never
+# enable a match — a failed position fails once, not once per name length.
+_NAME = r"(?>[A-Za-z](?:[A-Za-z0-9_.\-]|%(?:25)?(?:5[Ff]|2[DdEe])){1,63})"  # %5F / %2D / %2E: URL-encoded _ - .
 _VALUE = (r"(?:\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'"  # quoted scalar: whole, spaces included
           r"|[^\s\"',;&<>{}\[\]()/$=][^\s\"',;&<>{}\[\]()]*)")
 _ASSIGN = re.compile(
@@ -322,19 +325,22 @@ def mask_credentials(text: str) -> tuple[str, int]:
         text, n = _PEM.subn("[REDACTED]_PRIVATE_KEY", text)
         changes += n
     if ":" in text or "=" in text or "%3" in text:
-        text, n = _LINE.subn(_sub_line, text)  # multi-word line values first
-        changes += _count_new(n, text)
+        before = _labels(text)
+        text = _LINE.subn(_sub_line, text)[0]  # multi-word line values first
         text = _scan_assign(text)
-        changes += _count_new(1, text)
+        changes += _labels(text) - before
     if "--" in text:
-        text, n = _FLAG.subn(_sub_flag, text)
-        changes += _count_new(n, text)
+        before = _labels(text)
+        text = _FLAG.subn(_sub_flag, text)[0]
+        changes += _labels(text) - before
     return text, changes
 
 
-def _count_new(subn_count: int, text: str) -> int:
-    # subn counts every regex match (including unchanged ones); count real masks instead.
-    return text.count("[REDACTED]_SECRET_FIELD") + text.count("[REDACTED]_ID_FIELD") if subn_count else 0
+def _labels(text: str) -> int:
+    # Field-value masks create exactly these two labels and later stages never
+    # consume one, so a count delta is a real mask count (subn counts attempts,
+    # rejected matches included).
+    return text.count("[REDACTED]_SECRET_FIELD") + text.count("[REDACTED]_ID_FIELD")
 
 
 _AUTH_KEYS = frozenset({"authorization", "proxy-authorization"})

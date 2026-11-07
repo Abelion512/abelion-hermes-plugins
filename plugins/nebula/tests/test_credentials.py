@@ -294,3 +294,29 @@ def test_walk_failure_falls_back_to_round_trip(monkeypatch):
     monkeypatch.setattr(pii, "_mask_obj", boom)
     out = pii.pii_middleware({"messages": [{"role": "user", "content": f"api_key: {FAKE}"}]})["request"]
     assert FAKE not in json.dumps(out) and out["messages"][0]["role"] == "user"
+
+
+def test_quoted_angle_secret_is_masked_but_documentation_placeholders_stay():
+    secret = "<" + FAKE
+    for text in (
+        f'api_key="{secret}"',
+        f"api_key='{secret}'",
+        f'api_key="<{FAKE} with spaces"',
+    ):
+        out = masked(text)
+        assert FAKE not in out, text
+        assert MASK in out, text
+
+    assert cred.mask_value_for_key("api_key", secret)[1] == 1
+    assert cred.mask_value_for_key("authorization", secret)[1] == 1
+
+    for text in (
+        'api_key="<your-api-key>"',
+        'api_key="<token>"',
+        'api_key="<api-key>"',
+        'api_key="<...>"',
+        "API_KEY=<your-api-key>",
+        "access_token=<token>",
+    ):
+        assert masked(text) == text, text
+    assert cred.mask_value_for_key("api_key", "<your-api-key>") == ("<your-api-key>", 0)

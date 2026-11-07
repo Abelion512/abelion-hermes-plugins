@@ -4,6 +4,17 @@ import logging
 from .guard import GUARD
 
 logger = logging.getLogger(__name__)
+_stock_warned = False
+
+
+def _core_required() -> bool:
+    """Return True only when the host's required privacy policy is active."""
+    try:
+        from agent.privacy_guard import required
+        return bool(required())
+    except Exception:
+        logger.debug("Could not confirm the pinned required privacy core is active", exc_info=True)
+        return False
 
 def register(ctx):
     # Refuse legacy hosts rather than silently running a leaking stream transform.
@@ -17,6 +28,15 @@ def register(ctx):
     ctx.register_hook('pre_tool_call',GUARD.pre_tool)
     ctx.register_hook('transform_llm_output',GUARD.output,hold_stream=True)
     ctx.register_hook('on_session_end',GUARD.close)
+    if not _core_required():
+        global _stock_warned
+        if not _stock_warned:
+            _stock_warned = True
+            logger.warning(
+                "Nebula optional mode: auxiliary/title provider calls are NOT guarded "
+                "without the pinned required-policy core. Enable required mode with "
+                "the matching Hermes core to protect auxiliary egress."
+            )
 
     if hasattr(ctx,'register_system_prompt_section'):
         ctx.register_system_prompt_section('abelion.redact',
@@ -26,6 +46,8 @@ def register(ctx):
             'Do not paste placeholders into terminal commands, URLs, messages or delegate goals. '
             'A refusal means stop and report the limit, not bypass the policy. '
             'Never claim all unknown secrets or network traffic are protected. '
+            'Optional mode does not guard auxiliary/title provider calls; '
+            'required mode with the pinned core is needed for those. '
             'Usage and current limits are in the plugin README.md.', max_chars=1000)
 
     register_skill = getattr(ctx, 'register_skill', None)

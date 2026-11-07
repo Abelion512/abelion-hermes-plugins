@@ -46,7 +46,7 @@ Stop the test process. In that disposable profile, set `security.require_privacy
 
 ## Not covered
 
-Not a firewall or prompt-injection solution. Direct tool/service traffic (curl, browser uploads, MCP, TTS/STT, media generation and provider-specific memory calls), persisted user prompts, all progress UI/logs and unknown secret encodings are not universally protected. Native Hermes still has its own redaction at several of these sinks; that is not the same as this reversible PII policy.
+Not a firewall or prompt-injection solution. Auxiliary/title provider calls are guarded only in required mode with the pinned core; in optional mode they are unguarded. Direct tool/service traffic (curl, browser uploads, MCP, TTS/STT, media generation and provider-specific memory calls), persisted user prompts, all progress UI/logs and unknown secret encodings are not universally protected. Native Hermes still has its own redaction at several of these sinks; that is not the same as this reversible PII policy.
 
 ## Skills overview
 

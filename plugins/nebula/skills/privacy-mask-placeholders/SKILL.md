@@ -32,7 +32,10 @@ system-prompt note via register_system_prompt_section; keep both consistent.
    slots restore for local execution. Shell/terminal, URLs, outbound
    messages and delegate goals are blocked rather than interpolated — plan
    coding work around that.
-4. On a policy denial, change the input (remove media/unsupported objects or
+4. Optional mode does not guard auxiliary/title provider calls. Only required
+   mode with the pinned core protects those calls; the plugin warns at registration
+   when it cannot confirm that contract is active.
+5. On a policy denial, change the input (remove media/unsupported objects or
    session material), not just retry.
 
 ## Pitfalls

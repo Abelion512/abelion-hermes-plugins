@@ -108,7 +108,13 @@ _PATH_VALUE = re.compile(r"^(?:\.{0,2}/|~/|[A-Za-z]:\\)[\w./\\ -]+$")
 _TYPE_WORDS = frozenset({"string", "number", "integer", "boolean", "object", "array", "null", "none", "true",
                          "false", "secret", "required", "yes", "no", "on", "off", "n/a", "unset", "empty", "optional", "str", "bool", "int"})
 _PEM = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
-_PLACEHOLDER_START = ("[REDACTED", "${", "$(", "{{", "%(", "<", "***", "xxx", "your_", "your-", "changeme")
+_PLACEHOLDER_START = ("[REDACTED", "${", "$(", "{{", "%(", "***", "xxx", "your_", "your-", "changeme")
+# A documentation placeholder, not a bare '<' prefix: the whole value is an
+# enclosed angle-bracket token with a descriptive (letters-only) body, e.g.
+# <your-api-key>, <token>, <api-key>, <...>. A real secret that merely starts
+# with '<' (no closing '>', digits/spaces inside, trailing characters) is not
+# a placeholder and must be masked.
+_ANGLE_PLACEHOLDER = re.compile(r"<(?:your[-_][^<>\s]+|\.\.\.|[A-Za-z]+(?:[-_][A-Za-z]+)*)>")
 
 
 # Case is not a reliable word boundary: paSsWOrD and CoMPASs must not
@@ -214,7 +220,10 @@ def _plain_url(value: str) -> bool:
 
 def _looks_like_reference(value: str) -> bool:
     low = value.lower()
-    return low in _TYPE_WORDS or low.startswith(_PLACEHOLDER_START) or bool(_PATH_VALUE.match(value)) or _plain_url(value)
+    if low in _TYPE_WORDS or low.startswith(_PLACEHOLDER_START) or bool(_PATH_VALUE.match(value)) or _plain_url(value):
+        return True
+    stripped = value.strip()
+    return stripped.startswith("<") and bool(_ANGLE_PLACEHOLDER.fullmatch(stripped))
 
 
 def _label(kind: str) -> str:
@@ -333,7 +342,7 @@ _AUTH_KEYS = frozenset({"authorization", "proxy-authorization"})
 
 def mask_value_for_key(key: str, value: str) -> tuple[str, int]:
     """Structured data: the field name is a separate dict key, so decide by key. (value, changes)."""
-    if not isinstance(value, str) or not value or _looks_like_reference(value):
+    if not value or _looks_like_reference(value):
         return value, 0
     low = key.lower()
     if low in _AUTH_KEYS:

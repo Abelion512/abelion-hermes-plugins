@@ -315,3 +315,16 @@ def test_public_credential_shapes_are_masked_but_not_restored():
         assert match is not None, label
         tok = match[0]
         assert guard.output(tok, session_id=session_id, platform="cli") in (MARKER, tok), label
+
+
+def test_quoted_angle_secret_is_not_skipped_by_guard():
+    # Quoted '<'-prefixed secret must be masked; enclosed documentation
+    # placeholders are not credentials.
+    assert Guard().spans('api_key="<Zx9fake1234abcd5678"')
+    assert Guard().spans('api_key="<your-api-key>"') == []
+    assert Guard().spans("access_token=<token>") == []
+    out = Guard().request(
+        {"m": 'api_key="<Zx9fake1234abcd5678"'},
+        session_id="angle-placeholder",
+    )["request"]["m"]
+    assert "Zx9fake1234abcd5678" not in out

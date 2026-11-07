@@ -11,11 +11,11 @@ export CALL_LOG="$TMP/calls.log"
 
 cat > "$TMP/bin/git" <<'MOCK'
 #!/usr/bin/env bash
-printf 'git %s\\n' "$*" >> "$CALL_LOG"
+printf 'git %s\n' "$*" >> "$CALL_LOG"
 MOCK
 cat > "$TMP/bin/rsync" <<'MOCK'
 #!/usr/bin/env bash
-printf 'rsync %s\\n' "$*" >> "$CALL_LOG"
+printf 'rsync %s\n' "$*" >> "$CALL_LOG"
 MOCK
 chmod +x "$TMP/bin/git" "$TMP/bin/rsync"
 export PATH="$TMP/bin:$PATH"
@@ -28,7 +28,7 @@ for id in pii_mask_abelion screen output-redact-abelion; do
   status=$?
   set -e
   if [ "$status" -ne 2 ]; then
-    printf 'expected exit 2 for %s, got %s\\n%s\\n' "$id" "$status" "$output" >&2
+    printf 'expected exit 2 for %s, got %s\n%s\n' "$id" "$status" "$output" >&2
     exit 1
   fi
   grep -Fq "$id" <<< "$output"

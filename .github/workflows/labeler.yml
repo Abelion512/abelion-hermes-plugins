@@ -60,12 +60,17 @@ jobs:
                                   cf[gk] = [g if g.startswith(prefix + "/") else f"{prefix}/{g}" for g in globs]
                       combined[key] = rule
 
-          out = os.environ.get("GITHUB_OUTPUT", "/dev/null")
-          os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
           with open("merged_labeler.yml", "w", encoding="utf-8") as f:
               yaml.safe_dump(combined, f, sort_keys=False)
-          print("merged_labeler_path=merged_labeler.yml", file=os.environ["GITHUB_OUTPUT"] if "GITHUB_OUTPUT" in os.environ else sys.stdout)
-          print("labels_count=%d" % len(combined), file=os.environ["GITHUB_OUTPUT"] if "GITHUB_OUTPUT" in os.environ else sys.stdout)
+          # GITHUB_OUTPUT is a file path: open it, do not pass the string as print(file=...).
+          out = os.environ.get("GITHUB_OUTPUT")
+          stream = open(out, "a", encoding="utf-8") if out else sys.stdout
+          try:
+              print("merged_labeler_path=merged_labeler.yml", file=stream)
+              print("labels_count=%d" % len(combined), file=stream)
+          finally:
+              if out:
+                  stream.close()
           PY
       - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13
         with:

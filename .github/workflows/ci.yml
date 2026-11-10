@@ -66,6 +66,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: test legacy-install preflight
         run: bash tests/test_update_plugins_migration.sh
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.14"
+      - name: test labeler merge step
+        run: |
+          python -m pip install pyyaml
+          python .github/scripts/test_labeler_merge_step.py
 
   # Strict pre-merge credential guard: a PR that introduces a leaked secret, a
   # missing plugin manifest, or a bare provider-supplied key shape must not

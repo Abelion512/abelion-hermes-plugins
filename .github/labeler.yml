@@ -1,15 +1,5 @@
 # Applied by .github/workflows/labeler.yml.
-#
-# This file is the repo-level label set. It should cover shared/repo-wide paths
-# and remain stable as plugins appear and disappear. Plugin-specific path labels
-# live in each plugin's own .github/labels.yml so the repo labeler does not need
-# to be rewritten every time a plugin is added or removed.
-#
-# Priority-style labels (P0/P1/P2/P3, etc.) are set by convention and/or CI /
-# issue triage, not by changed-files alone. Use them to rank work, not to guess
-# impact from a glob.
-
-# Repo-wide labels
+# Shared labels only; plugin-specific ownership labels live in plugins/<id>/.github/labels.yml.
 
 ci:
   - changed-files:
@@ -26,24 +16,24 @@ documentation:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/plugin-docs-standard.md"
+          - ".github/task-templates/**"
           - "plugins/**/docs/**"
           - "plugins/**/README.md"
           - "plugins/**/e2e/README.md"
           - "README.md"
 
+repo-tools:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/task-templates/**"
+          - ".github/triage-priority.md"
+          - ".github/labeler.yml"
+          - ".github/plugin-docs-standard.md"
+          - ".github/dependabot.yml"
+          - ".plugins/**"
+
 security-audit:
   - changed-files:
-      - any-glob-to-any-file: ".github/e2e_support/**"
-
-# Plugin ownership is handled by each plugin-local labels.yml.
-# The repo labeler merge step reads plugins/*/.github/labels.yml and applies
-# those labels in addition to the repo labels above.
-#
-# If a plugin wants its own path labels, add them in:
-#   plugins/<id>/.github/labels.yml
-#
-# Required-format example:
-#
-# plugin-feature:
-#   - changed-files:
-#       - any-glob-to-any-file: "src/**"
+      - any-glob-to-any-file:
+          - ".github/e2e_support/**"
+          - "plugins/nebula/validation/**"

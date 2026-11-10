@@ -11,8 +11,6 @@ updates:
     groups:
       python-deps:
         patterns: ["*"]
-    # fastapi/starlette/uvicorn/websockets in screen/tests are pinned to match
-    # the Hermes managed env. Bump PRs for them need a check against Hermes.
 
   # Keeps SHA-pinned actions in .github/workflows current.
   - package-ecosystem: github-actions

@@ -56,4 +56,25 @@ class T(unittest.TestCase):
  def test_observational_scope_not_accepted_by_default(self):
   self.assertIs(S.OBSERVATIONAL_SCOPE_OWNER_ACCEPTED,False)
   self.assertIn('NOT verified',S.classify_semantic(ctx('a.py',"# a\nx = 1\n",d('a.py',"@@ -1 +1,2 @@\n+# a\n x = 1\n")))['scope']['reasons'][0])
+ def test_directive_signature_preserves_order_position_and_indent(self):
+  samples = [
+   ("x=[1,2]\n# fmt: off\ny=[3,4]\n# fmt: on\n", "# fmt: off\nx=[1,2]\n# fmt: on\ny=[3,4]\n"),
+   ("# fmt: off\n# fmt: on\nx=1\n", "# fmt: on\n# fmt: off\nx=1\n"),
+   ("def f():\n    # pylint: disable=unused-variable\n    x=1\n", "def f():\n# pylint: disable=unused-variable\n    x=1\n"),
+   ("# fmt: off\nx=1\n", "# comment\n# fmt: off\nx=1\n"),
+  ]
+  import difflib
+  for base, head in samples:
+   with self.subTest(base=base, head=head):
+    diff = "diff --git a/a.py b/a.py\nindex 1..2 100644\n" + "".join(difflib.unified_diff(base.splitlines(True), head.splitlines(True), fromfile="a/a.py", tofile="b/a.py"))
+    with self.assertRaisesRegex(ValueError, 'p4_sem_directive_comment_changed'):
+     S.classify_semantic(ctx('a.py', head, diff))
+ def test_directive_signature_unchanged_and_crlf(self):
+  text = "# fmt: off\nx=1\n# fmt: on\n"
+  self.assertEqual(S._directive_lines(text), S._directive_lines(text.replace('\n', '\r\n')))
+  self.assertEqual(S._directive_lines(text), [(0, '# fmt: off'), (2, '# fmt: on')])
+ def test_comment_change_after_fixed_directives_passes(self):
+  head = "# fmt: off\nx=1\n# fmt: on\n# new\n"
+  diff = d('a.py', "@@ -1,4 +1,4 @@\n # fmt: off\n x=1\n # fmt: on\n-# old\n+# new\n")
+  self.assertTrue(S.classify_semantic(ctx('a.py', head, diff)))
 if __name__=='__main__':unittest.main()

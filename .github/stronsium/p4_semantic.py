@@ -105,7 +105,7 @@ _DIRECTIVE = re.compile(r'#.*\b(type:\s*ignore|noqa|pragma|fmt:|yapf:|isort:|pyl
 
 
 def _directive_lines(text):
-    return sorted(l.strip() for l in text.replace('\r\n', '\n').split('\n') if _DIRECTIVE.search(l))
+    return [(i, l) for i, l in enumerate(text.replace('\r\n', '\n').split('\n')) if _DIRECTIVE.search(l)]
 
 
 def _header(text):

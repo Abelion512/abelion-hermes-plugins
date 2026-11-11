@@ -1,0 +1,25 @@
+{
+ "version": 1,
+ "members": [
+  ".github/stronsium/github_proof_transport.py",
+  ".github/stronsium/p4_checks_program.py",
+  ".github/stronsium/p4_semantic.py",
+  ".github/stronsium/p4_semantic_test.py",
+  ".github/stronsium/producer_context.py",
+  ".github/stronsium/producer_fixture_program.py",
+  ".github/stronsium/producer_flow_test.py",
+  ".github/stronsium/producer_identity.py",
+  ".github/stronsium/producer_test.py",
+  ".github/stronsium/proof_closure.py",
+  ".github/stronsium/proof_context.py",
+  ".github/stronsium/proof_evidence.py",
+  ".github/stronsium/proof_producer.py",
+  ".github/stronsium/proof_test.py",
+  ".github/stronsium/run_producer.py",
+  ".github/stronsium/run_producer_comment.py",
+  ".github/stronsium/run_producer_test.py",
+  ".github/stronsium/triage.py",
+  ".github/workflows/stronsium-proof-tests.yml",
+  ".github/workflows/stronsium-proof.yml"
+ ]
+}

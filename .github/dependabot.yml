@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Every plugin folder (and tests/ inside it) with a requirements*.txt.
+  # The glob also covers plugins added later.
+  - package-ecosystem: pip
+    directories:
+      - "/**/*"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-deps:
+        patterns: ["*"]
+    # fastapi/starlette/uvicorn/websockets in screen/tests are pinned to match
+    # the Hermes managed env. Bump PRs for them need a check against Hermes.
+
+  # Keeps SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ["*"]

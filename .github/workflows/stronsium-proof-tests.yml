@@ -1,0 +1,23 @@
+# Offline unit tests for the proof producer. No secrets, read-only, no network use by the tests.
+name: stronsium-proof-tests
+on:
+  pull_request:
+    paths:
+      - ".github/stronsium/**"
+      - ".github/workflows/stronsium-proof*.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.14"
+      - name: producer unit tests
+        working-directory: .github/stronsium
+        run: python3 -B -m unittest discover -p "*_test.py" -v

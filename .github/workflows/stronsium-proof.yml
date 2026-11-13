@@ -1,0 +1,42 @@
+# Trusted proof producer for Stronsium. Runs from the DEFAULT-branch file on every PR update; no human trigger.
+# pull_request_target runs in the context of the default branch (GITHUB_SHA = last default-branch commit, GITHUB_REF = default
+# branch), so PR content can never define or change this workflow. PR code is NEVER checked out, built or run here:
+# the producer only reads the PR through the GitHub API as data and parses Python with ast.parse.
+# Source: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows (pull_request_target)
+name: stronsium-proof
+run-name: stronsium-proof-pr${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: stronsium-proof-pr${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # actions/checkout v7.0.1 (same pin as ci.yml). Default branch only: no ref input, so never the PR head.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # actions/setup-python v7.1.0 (same pin as ci.yml)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.14"
+      - id: p
+        # PR number comes from the event payload via env, never interpolated into the shell. Digest is computed inside.
+        run: python3 -B .github/stronsium/run_producer_comment.py "$PR_NUMBER" 0 proof.json
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: stronsium-proof-${{ steps.p.outputs.digest }}
+          path: proof.json
+          if-no-files-found: error
+          retention-days: 7
